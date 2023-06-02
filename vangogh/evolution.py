@@ -2,7 +2,7 @@ import time
 
 import numpy as np
 from PIL import Image
-from multiprocess import Pool, cpu_count
+from multiprocessing import Pool, cpu_count
 
 from vangogh import selection, variation
 from vangogh.fitness import drawing_fitness_function, draw_voronoi_image
@@ -133,6 +133,27 @@ class Evolution:
         self.population = selection.select(self.population, self.population_size,
                                            selection_name=self.selection_name)
 
+
+    def __umda_generation(self):
+        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        offspring.genes[:] = self.population.genes[:]
+        offspring.shuffle()
+
+        for i in range(self.genotype_length):
+            hist, bins = np.histogram(offspring.genes[:, i], bins=256, range=(0, 256), density=True)
+            distribution = hist / np.sum(hist)
+            offspring.genes[:, i] = np.random.choice(np.arange(len(distribution)), size=self.population_size, p=distribution)
+
+        offspring.fitnesses = drawing_fitness_function(offspring.genes, self.reference_image)
+
+        self.num_evaluations += len(offspring.genes)
+
+        self.__update_elite(offspring)
+
+        self.population.stack(offspring)
+
+        self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
+
     def run(self):
         data = []
 
@@ -159,6 +180,8 @@ class Evolution:
 
             if self.evolution_type == 'classic':
                 self.__classic_generation(merge_parent_offspring=False)
+            elif self.evolution_type == 'UMDA':
+                self.__umda_generation()
             elif self.evolution_type == 'p+o':
                 self.__classic_generation(merge_parent_offspring=True)
             else:
@@ -214,3 +237,4 @@ if __name__ == '__main__':
                     noisy_evaluations=False,
                     verbose=True)
     evo.run()
+
