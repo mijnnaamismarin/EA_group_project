@@ -1,0 +1,9 @@
+dill==0.3.3
+numpy>=1.16.1
+imgcompare==0.1.0
+multiprocess==0.70.11.1
+Pillow==8.3.2
+scipy
+matplotlib
+seaborn
+pandas
