@@ -9,6 +9,8 @@ from vangogh.fitness import drawing_fitness_function, draw_voronoi_image
 from vangogh.population import Population
 from vangogh.util import NUM_VARIABLES_PER_POINT, IMAGE_SHRINK_SCALE, REFERENCE_IMAGE
 
+from EDAspy.optimization import UMDAc, UMDAd
+from textwrap import wrap
 
 class Evolution:
     def __init__(self,
@@ -64,6 +66,8 @@ class Evolution:
         self.num_evaluations = 0
         self.initialization = initialization
 
+        self.distribution = np.zeros(40)
+
         np.random.seed(seed)
         self.seed = seed
 
@@ -110,11 +114,14 @@ class Evolution:
         offspring = Population(self.population_size, self.genotype_length, self.initialization)
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
+        
         # variation
         offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
         offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
                                            mutation_probability=self.mutation_probability,
                                            num_features_mutation_strength=self.num_features_mutation_strength)
+        
+
         # evaluate offspring
         offspring.fitnesses = drawing_fitness_function(offspring.genes,
                                                        self.reference_image)
@@ -132,11 +139,71 @@ class Evolution:
 
         self.population = selection.select(self.population, self.population_size,
                                            selection_name=self.selection_name)
+    
+    def __umda_generation(self):
+        sampled_population = np.zeros(self.population.genes.shape)
+
+        num_points = self.genotype_length//NUM_VARIABLES_PER_POINT
+        for i in range(self.population_size):
+            sampled_individual = []
+            for j in range(num_points):
+                bin_str = ""
+                for prob in self.distribution:
+                    bin_str += str(int(prob > np.random.rand()))
+                vars = wrap(bin_str, 8)
+                for var in vars:
+                    sampled_individual.append(int(var, 2))
+            sampled_population[i] = np.array(sampled_individual)
+
+        new_pop = Population(self.population_size, self.genotype_length, self.initialization)
+        new_pop.genes[:] = sampled_population[:]
+
+        new_pop.fitnesses = drawing_fitness_function(new_pop.genes,
+                                                       self.reference_image)
+        self.num_evaluations += len(new_pop.genes)
+        self.__update_elite(new_pop)
+
+        self.population = new_pop
+
+        fitness_index = self.population.fitnesses.argsort()
+        best_half = self.population.genes[fitness_index[:len(fitness_index)//2]]
+        half = Population(self.population_size//2, self.genotype_length, self.initialization)
+        half.genes[:] = best_half
+        
+        self.__update_distribution(half)
+
+
+
+    def __init_distribution(self):
+        for i in range(len(self.distribution)):
+            self.distribution[i] = 0.5
+
+
+
+    def __update_distribution(self, population):
+        freq_counts = np.zeros(40)
+        num_points = len(population.genes[0])//NUM_VARIABLES_PER_POINT
+        total_bits = len(population.genes) * num_points
+        for individual in population.genes:
+            for i in range(num_points):
+                p = i * NUM_VARIABLES_PER_POINT
+                x, y, r, g, b = individual[p:p+NUM_VARIABLES_PER_POINT]
+                x_bin, y_bin, r_bin, g_bin, b_bin = format(x, "08b"), format(y, "08b"), format(r, "08b"), format(g, "08b"), format(b, "08b")
+                bin_genes = x_bin + y_bin + r_bin + g_bin + b_bin
+                for i, bit in enumerate(bin_genes):
+                    freq_counts[i] += int(bit)
+        self.distribution = freq_counts/total_bits
+        print("DISTRIBUTION", self.distribution)
+
 
     def run(self):
         data = []
 
         self.population.initialize(self.feature_intervals)
+
+
+        self.__update_distribution(self.population)
+        #self.__init_distribution()
 
         self.population.fitnesses = drawing_fitness_function(self.population.genes,
                                                              self.reference_image)
@@ -161,6 +228,8 @@ class Evolution:
                 self.__classic_generation(merge_parent_offspring=False)
             elif self.evolution_type == 'p+o':
                 self.__classic_generation(merge_parent_offspring=True)
+            elif self.evolution_type == 'umda':
+                self.__umda_generation()
             else:
                 raise ValueError('unknown evolution type:', self.evolution_type)
 

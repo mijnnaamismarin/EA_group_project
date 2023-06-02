@@ -38,7 +38,6 @@ def draw_voronoi_matrix(genotype, img_width, img_height, scale=1):
             for j in range(3):
                 data[y, x, j] = colors[query_point_regions[i]][j]
             i += 1
-
     return data
 
 
@@ -53,12 +52,12 @@ def compute_difference(genotype, reference_image: Image):
     actual = draw_voronoi_matrix(genotype, reference_image.width, reference_image.height)
 
     diff = image_diff(Image.fromarray(actual, 'RGB'), expected)
-
     return diff
 
 
 def worker(args):
     return compute_difference(args[0], args[1])
+
 
 def drawing_fitness_function(genes, reference_image: Image):
     if len(QUERY_POINTS) == 0:
