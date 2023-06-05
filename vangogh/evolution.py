@@ -132,7 +132,7 @@ class Evolution:
 
         self.population = selection.select(self.population, self.population_size,
                                            selection_name=self.selection_name)
-
+        
     def __umda_generation(self):
         offspring = Population(self.population_size, self.genotype_length, self.initialization)
         offspring.genes[:] = self.population.genes[:]
@@ -143,6 +143,38 @@ class Evolution:
             distribution = hist / np.sum(hist)
             offspring.genes[:, i] = np.random.choice(np.arange(len(distribution)), size=self.population_size,
                                                      p=distribution).astype(int)
+
+        offspring.fitnesses = drawing_fitness_function(offspring.genes, self.reference_image)
+
+        self.num_evaluations += len(offspring.genes)
+
+        self.__update_elite(offspring)
+
+        self.population.stack(offspring)
+
+        self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
+
+    def __pfda_generation(self):
+        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        offspring.genes[:] = self.population.genes[:]
+        offspring.shuffle()
+
+        # Group x, y, r, g, b rows together 
+        # Create distribution over grouped genes
+        # sample from that new distribution and assign new genes
+
+        rows = np.array([i for i in range(0, self.genotype_length, NUM_VARIABLES_PER_POINT)])
+        for i in range(NUM_VARIABLES_PER_POINT):
+            row_indices = rows + i
+            grouped_genes = offspring.genes[:, row_indices]        
+            distribution, bins = np.histogram(grouped_genes, bins=256, range=(0, 256), density=True)
+            sampled_genes = np.random.choice(np.arange(len(distribution)), size=grouped_genes.shape, p=distribution).astype(int)
+            offspring.genes[:, row_indices] = sampled_genes      
+
+        # offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
+        # offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
+        #                                    mutation_probability=self.mutation_probability,
+        #                                    num_features_mutation_strength=self.num_features_mutation_strength)
 
         offspring.fitnesses = drawing_fitness_function(offspring.genes, self.reference_image)
 
@@ -182,6 +214,8 @@ class Evolution:
                 self.__classic_generation(merge_parent_offspring=False)
             elif self.evolution_type == 'UMDA':
                 self.__umda_generation()
+            elif self.evolution_type == 'PFDA':
+                self.__pfda_generation()
             elif self.evolution_type == 'p+o':
                 self.__classic_generation(merge_parent_offspring=True)
             else:
