@@ -1,3 +1,4 @@
+import random
 import time
 
 import numpy as np
@@ -28,8 +29,11 @@ class Evolution:
                  noisy_evaluations=False,
                  verbose=False,
                  generation_reporter=None,
+                 PBIL_learning_rate=0.1,
+                 PBIL_learning_rate_neg=0.075,
                  seed=0):
 
+        self.probabilities = None
         self.reference_image: Image = reference_image.copy()
         self.reference_image.thumbnail((int(self.reference_image.width / IMAGE_SHRINK_SCALE),
                                         int(self.reference_image.height / IMAGE_SHRINK_SCALE)),
@@ -63,6 +67,8 @@ class Evolution:
         self.crossover_method = crossover_method
         self.num_evaluations = 0
         self.initialization = initialization
+        self.PBIL_learning_rate = PBIL_learning_rate
+        self.PBIL_learning_rate_neg = PBIL_learning_rate_neg
 
         np.random.seed(seed)
         self.seed = seed
@@ -154,9 +160,53 @@ class Evolution:
 
         self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
 
-    def run(self):
-        data = []
+    def __pbil_generation(self):
+        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        offspring.genes[:] = self.population.genes[:]
+        offspring.shuffle()
 
+        offspring.fitnesses = drawing_fitness_function(offspring.genes, self.reference_image)
+
+        self.__update_elite(offspring)
+
+        parents = selection.select(offspring, self.population_size, selection_name=self.selection_name)
+
+        for i in range(self.genotype_length):
+            hist, bins = np.histogram(parents.genes[:, i], bins=self.feature_intervals[i][1],
+                                      range=(self.feature_intervals[i][0], self.feature_intervals[i][1]), density=True)
+            parent_probability = hist / np.sum(hist)
+
+            self.probabilities[i] = (1.0 - self.PBIL_learning_rate) * self.probabilities[i] \
+                                    + self.PBIL_learning_rate * parent_probability
+
+            mut_shift = 0.05
+            mut_prob = 0.02
+
+            mask_mutate = np.random.choice([False, True], size=self.probabilities[i].shape,
+                                           p=[1.0 - mut_prob, mut_prob])
+
+            mutate_indices = np.arange(mask_mutate.size)[mask_mutate]
+
+            mutation = np.random.randint(0, high=2, size=mutate_indices.size)
+
+            self.probabilities[i][mutate_indices] = self.probabilities[i][mutate_indices] \
+                                                    * (1.0 - mut_shift) + mutation * mut_shift
+
+            self.probabilities[i] /= self.probabilities[i].sum()
+
+            offspring.genes[:, i] = np.random.choice(np.arange(self.feature_intervals[i][1]), size=self.population_size,
+                                                     p=self.probabilities[i]).astype(int)
+
+        self.num_evaluations += len(offspring.genes)
+
+        self.population = offspring
+
+    def __cga_generation(self):
+        pass
+
+    def run(self, experiment_data):
+        data = []
+        self.population = Population(self.population_size, self.genotype_length, self.initialization)
         self.population.initialize(self.feature_intervals)
 
         self.population.fitnesses = drawing_fitness_function(self.population.genes,
@@ -180,13 +230,26 @@ class Evolution:
 
             if self.evolution_type == 'classic':
                 self.__classic_generation(merge_parent_offspring=False)
+            elif self.evolution_type == 'PBIL':
+                self.probabilities = np.empty(self.genotype_length, dtype=object)
+                for i in range(self.genotype_length):
+                    hist, bins = np.histogram(self.population.genes[:, i], bins=self.feature_intervals[i][1],
+                                              range=(self.feature_intervals[i][0], self.feature_intervals[i][1]),
+                                              density=True)
+                    self.probabilities[i] = hist / np.sum(hist)
+
+                self.__pbil_generation()
             elif self.evolution_type == 'UMDA':
                 self.__umda_generation()
+            elif self.evolution_type == 'cGA':
+                self.__cga_generation()
             elif self.evolution_type == 'p+o':
                 self.__classic_generation(merge_parent_offspring=True)
             else:
                 raise ValueError('unknown evolution type:', self.evolution_type)
 
+            experiment_data.add_measurement(time.time() - start_time_seconds, np.mean(self.population.fitnesses),
+                                            self.elite_fitness)
             # generation terminated
             i_gen += 1
             if self.verbose:
@@ -220,20 +283,3 @@ class Evolution:
             .save(
             f"./img/van_gogh_final_{self.seed}_{self.population_size}_{self.crossover_method}_{self.num_points}_{self.initialization}_{self.generation_budget}.png")
         return data
-
-
-if __name__ == '__main__':
-    evo = Evolution(100,
-                    REFERENCE_IMAGE,
-                    evolution_type='p+o',
-                    population_size=100,
-                    generation_budget=300,
-                    crossover_method='ONE_POINT',
-                    initialization='RANDOM',
-                    num_features_mutation_strength=.25,
-                    num_features_mutation_strength_decay=None,
-                    num_features_mutation_strength_decay_generations=None,
-                    selection_name='tournament_4',
-                    noisy_evaluations=False,
-                    verbose=True)
-    evo.run()
