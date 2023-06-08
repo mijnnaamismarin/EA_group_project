@@ -160,9 +160,8 @@ class Evolution:
     def __pfda_generation(self):
         offspring = Population(self.population_size, self.genotype_length, self.initialization)
         offspring.genes[:] = self.population.genes[:]
-        #offspring.shuffle()
+        offspring.shuffle()
 
-        # x, y distribution
         rows = np.array([i for i in range(0, self.genotype_length, NUM_VARIABLES_PER_POINT)])
         x_row_indices = rows
         y_row_indices = rows + 1
@@ -174,37 +173,22 @@ class Evolution:
         new_x_genes = np.zeros(x_genes.shape, dtype=np.int16)
         new_y_genes = np.zeros(y_genes.shape, dtype=np.int16)
 
-        for i in range(len(x_genes)):
-            count_mat = np.zeros((self.reference_image.width, self.reference_image.height))
-            x_col, y_col = x_genes[i], y_genes[i]
+        for i in range(x_genes.shape[1]):
+            count_mat = np.zeros((self.reference_image.width, self.reference_image.height+1))
+            
+            x_col, y_col = x_genes[:, i], y_genes[:, i]
+
             for x, y in zip(x_col, y_col):
                 count_mat[x][y] += 1
             
-            probs = (count_mat/x_genes.shape[1]).flatten()
-            sampled_indices = np.random.choice(len(probs), size=x_genes.shape[1], p=probs)
+            probs = (count_mat/x_genes.shape[0]).flatten()
+            sampled_indices = np.random.choice(len(probs), size=x_genes.shape[0], p=probs)
             sampled_x = sampled_indices // self.reference_image.width
             sampled_y = sampled_indices % self.reference_image.height
 
-            new_x_genes[i] = sampled_x
-            new_y_genes[i] = sampled_y
-
-            #x_col, y_col = x_genes[i], y_genes[i]
-            #probs = {}
-            #for x, y in zip(x_col, y_col):
-            #    xy = str(x)+'|'+str(y)
-            #    probs[xy] = probs.get(xy, 0) + 1
-            #probs = {k:v/len(x_col) for k, v in probs.items()}
-            #distribution = np.array(list(probs.values()))
-            #values = np.array(list(probs.keys()))
-            #sampled_indices = np.random.choice(np.arange(len(distribution)), size=len(x_col), p=distribution)
-            #sampled_values = values[sampled_indices]
-            #sampled_xy = np.array([[int(x.split('|')[0]), int(x.split('|')[1])] for x in sampled_values])
-            #sampled_x = sampled_xy[:, 0]
-            #sampled_y = sampled_xy[:, 1]
-            #new_x_genes[i] = sampled_x
-            #new_y_genes[i] = sampled_y
-
-
+            new_x_genes[:, i] = sampled_x
+            new_y_genes[:, i] = sampled_y
+            
 
         offspring.genes[:, x_row_indices] = new_y_genes
         offspring.genes[:, y_row_indices] = new_x_genes
@@ -222,19 +206,19 @@ class Evolution:
         new_g_genes = np.zeros(g_genes.shape, dtype=np.int16)
         new_b_genes = np.zeros(b_genes.shape, dtype=np.int16)
 
-        for i in range(len(r_genes)):
-            r_col, g_col, b_col = r_genes[i], g_genes[i], b_genes[i]
+        for i in range(r_genes.shape[1]):
+            r_col, g_col, b_col = r_genes[:, i], g_genes[:, i], b_genes[:, i]
             count_dict = {}
             for r, g, b in zip(r_col, g_col, b_col):
                 key = str(r)+'|'+str(g)+'|'+str(b)
                 count_dict[key] = count_dict.get(key, 0) + 1
 
-            total_values = r_genes.shape[1]
+            total_values = r_genes.shape[0]
             probs = {k: v/total_values for k, v in count_dict.items()}
                         
             distribution = np.array(list(probs.values()))
             values = np.array(list(probs.keys()))
-            sampled_indices = np.random.choice(np.arange(len(distribution)), size=r_genes.shape[1], p=distribution)
+            sampled_indices = np.random.choice(np.arange(len(distribution)), size=r_genes.shape[0], p=distribution)
             sampled_values = values[sampled_indices]
             sampled_rgb = np.array([[int(x.split('|')[0]), int(x.split('|')[1]), int(x.split('|')[2])] for x in sampled_values])
 
@@ -242,9 +226,9 @@ class Evolution:
             sampled_g = sampled_rgb[:, 1]
             sampled_b = sampled_rgb[:, 2]
 
-            new_r_genes[i] = sampled_r
-            new_g_genes[i] = sampled_g
-            new_b_genes[i] = sampled_b
+            new_r_genes[:, i] = sampled_r
+            new_g_genes[:, i] = sampled_g
+            new_b_genes[:, i] = sampled_b
 
 
         offspring.genes[:, r_row_indices] = new_r_genes
@@ -254,7 +238,7 @@ class Evolution:
 
         offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
         offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
-                                           mutation_probability=self.mutation_probability*self.population_size//2,
+                                           mutation_probability=self.mutation_probability,
                                            num_features_mutation_strength=self.num_features_mutation_strength)
 
         offspring.fitnesses = drawing_fitness_function(offspring.genes, self.reference_image)
@@ -271,7 +255,7 @@ class Evolution:
         data = []
 
         self.population.initialize(self.feature_intervals)
-        
+
         self.population.fitnesses = drawing_fitness_function(self.population.genes,
                                                              self.reference_image)
         self.num_evaluations = len(self.population.genes)
