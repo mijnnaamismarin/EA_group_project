@@ -113,7 +113,9 @@ class Evolution:
 
     def __classic_generation(self, merge_parent_offspring=False):
         # create offspring population
-        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        #offspring = Population(self.population_size, self.genotype_length, self.initialization)###
+        print(f"num population:{self.population.genes.shape[0]}")
+        offspring = Population(self.population.genes.shape[0], self.genotype_length, self.initialization)###
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
         # variation
@@ -126,7 +128,7 @@ class Evolution:
                                                        self.reference_image)
         self.num_evaluations += len(offspring.genes)
 
-        self.__update_elite(offspring)
+        self.__update_elite(offspring)###jin
 
         # selection
         if merge_parent_offspring:
@@ -135,9 +137,12 @@ class Evolution:
         else:
             # just replace the entire thing
             self.population = offspring
-
+        
         self.population = selection.select(self.population, self.population_size,
                                            selection_name=self.selection_name)
+        # self.population.fitnesses = drawing_fitness_function(self.population.genes,
+        #                                                self.reference_image)  ###jin
+        #self.__update_elite(self.population)###jin
 
     def __umda_generation(self):
         offspring = Population(self.population_size, self.genotype_length, self.initialization)
