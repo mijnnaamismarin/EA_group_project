@@ -139,7 +139,7 @@ class Evolution:
         offspring.shuffle()
 
         for i in range(self.genotype_length):
-            hist, bins = np.histogram(offspring.genes[:, i], bins=256, range=(0, 256), density=True)
+            hist, bins = np.histogram(offspring.genes[:, i], bins=self.reference_image.width, range=(0, self.reference_image.width), density=True)
             distribution = hist / np.sum(hist)
             offspring.genes[:, i] = np.random.choice(np.arange(len(distribution)), size=self.population_size,
                                                      p=distribution).astype(int)
@@ -163,18 +163,79 @@ class Evolution:
         # Create distribution over grouped genes
         # sample from that new distribution and assign new genes
 
-        rows = np.array([i for i in range(0, self.genotype_length, NUM_VARIABLES_PER_POINT)])
-        for i in range(NUM_VARIABLES_PER_POINT):
-            row_indices = rows + i
-            grouped_genes = offspring.genes[:, row_indices]        
-            distribution, bins = np.histogram(grouped_genes, bins=256, range=(0, 256), density=True)
-            sampled_genes = np.random.choice(np.arange(len(distribution)), size=grouped_genes.shape, p=distribution).astype(int)
-            offspring.genes[:, row_indices] = sampled_genes      
 
-        # offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
-        # offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
-        #                                    mutation_probability=self.mutation_probability,
-        #                                    num_features_mutation_strength=self.num_features_mutation_strength)
+        # for i in range(NUM_VARIABLES_PER_POINT):
+        #     row_indices = rows + i
+        #     grouped_genes = offspring.genes[:, row_indices]        
+        #     distribution, bins = np.histogram(grouped_genes, bins=256, range=(0, 256), density=True)
+        #     sampled_genes = np.random.choice(np.arange(len(distribution)), size=grouped_genes.shape, p=distribution).astype(int)
+        #     offspring.genes[:, row_indices] = sampled_genes      
+
+        # x, y distribution
+        rows = np.array([i for i in range(0, self.genotype_length, NUM_VARIABLES_PER_POINT)])
+        x_row_indices = rows
+        y_row_indices = rows + 1
+        x_genes = offspring.genes[:, x_row_indices].flatten()
+        y_genes = offspring.genes[:, y_row_indices].flatten()
+
+        probs = {}
+        for x, y in zip(x_genes, y_genes):
+            xy = str(x)+'|'+str(y)
+            probs[xy] = probs.get(xy, 0) + 1
+        probs = {k:v/len(x_genes) for k, v in probs.items()}
+
+        distribution = np.array(list(probs.values()))
+        values = np.array(list(probs.keys()))
+        sampled_indices = np.random.choice(np.arange(len(distribution)), size=len(x_genes), p=distribution).astype(int)
+        sampled_values = values[sampled_indices]
+        sampled_xy = np.array([[int(x.split('|')[0]), int(x.split('|')[1])] for x in sampled_values])
+        
+        x_genes_sampled = sampled_xy[:, 0]
+        y_genes_sampled = sampled_xy[:, 1]
+
+        #TODO make proper
+        gene_shape = offspring.genes[:, x_row_indices].shape
+
+        offspring.genes[:, x_row_indices] = x_genes_sampled.reshape(gene_shape)
+        offspring.genes[:, y_row_indices] = y_genes_sampled.reshape(gene_shape)
+
+
+        ###############################################################################################
+
+        r_row_indices = rows + 2
+        g_row_indices = rows + 3
+        b_row_indices = rows + 4
+
+        r_genes = offspring.genes[:, r_row_indices].flatten()
+        g_genes = offspring.genes[:, g_row_indices].flatten()
+        b_genes = offspring.genes[:, b_row_indices].flatten()
+
+        probs_colour = {}
+        for r, g, b in zip(r_genes, g_genes, b_genes):
+            rgb = str(r)+'|'+str(g)+'|'+str(b)
+            probs_colour[rgb] = probs_colour.get(rgb, 0) + 1
+        probs_colour = {k:v/len(r_genes) for k, v in probs_colour.items()}
+
+        distribution = np.array(list(probs_colour.values()))
+        values = np.array(list(probs_colour.keys()))
+        sampled_indices = np.random.choice(np.arange(len(distribution)), size=len(r_genes), p=distribution).astype(int)
+        sampled_values = values[sampled_indices]
+        sampled_rgb = np.array([[int(x.split('|')[0]), int(x.split('|')[1]), int(x.split('|')[2])] for x in sampled_values])
+
+        r_genes_sampled = sampled_rgb[:, 0]
+        g_genes_sampled = sampled_rgb[:, 1]
+        b_genes_sampled = sampled_rgb[:, 2]
+
+        offspring.genes[:, r_row_indices] = r_genes_sampled.reshape(gene_shape)
+        offspring.genes[:, g_row_indices] = g_genes_sampled.reshape(gene_shape)
+        offspring.genes[:, b_row_indices] = b_genes_sampled.reshape(gene_shape)
+
+
+
+        offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
+        offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
+                                           mutation_probability=self.mutation_probability,
+                                           num_features_mutation_strength=self.num_features_mutation_strength)
 
         offspring.fitnesses = drawing_fitness_function(offspring.genes, self.reference_image)
 
