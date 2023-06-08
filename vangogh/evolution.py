@@ -9,6 +9,8 @@ from vangogh.fitness import drawing_fitness_function, draw_voronoi_image
 from vangogh.population import Population
 from vangogh.util import NUM_VARIABLES_PER_POINT, IMAGE_SHRINK_SCALE, REFERENCE_IMAGE
 
+from collections import defaultdict
+
 
 class Evolution:
     def __init__(self,
@@ -139,7 +141,7 @@ class Evolution:
         offspring.shuffle()
 
         for i in range(self.genotype_length):
-            hist, bins = np.histogram(offspring.genes[:, i], bins=self.reference_image.width, range=(0, self.reference_image.width), density=True)
+            hist, bins = np.histogram(offspring.genes[:, i], bins=256, range=(0, 256), density=True)
             distribution = hist / np.sum(hist)
             offspring.genes[:, i] = np.random.choice(np.arange(len(distribution)), size=self.population_size,
                                                      p=distribution).astype(int)
@@ -154,88 +156,98 @@ class Evolution:
 
         self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
 
+
     def __pfda_generation(self):
         offspring = Population(self.population_size, self.genotype_length, self.initialization)
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
 
-        # Group x, y, r, g, b rows together 
-        # Create distribution over grouped genes
-        # sample from that new distribution and assign new genes
-
-
-        # for i in range(NUM_VARIABLES_PER_POINT):
-        #     row_indices = rows + i
-        #     grouped_genes = offspring.genes[:, row_indices]        
-        #     distribution, bins = np.histogram(grouped_genes, bins=256, range=(0, 256), density=True)
-        #     sampled_genes = np.random.choice(np.arange(len(distribution)), size=grouped_genes.shape, p=distribution).astype(int)
-        #     offspring.genes[:, row_indices] = sampled_genes      
-
         # x, y distribution
         rows = np.array([i for i in range(0, self.genotype_length, NUM_VARIABLES_PER_POINT)])
         x_row_indices = rows
         y_row_indices = rows + 1
-        x_genes = offspring.genes[:, x_row_indices].flatten()
-        y_genes = offspring.genes[:, y_row_indices].flatten()
-
-        probs = {}
-        for x, y in zip(x_genes, y_genes):
-            xy = str(x)+'|'+str(y)
-            probs[xy] = probs.get(xy, 0) + 1
-        probs = {k:v/len(x_genes) for k, v in probs.items()}
-
-        distribution = np.array(list(probs.values()))
-        values = np.array(list(probs.keys()))
-        sampled_indices = np.random.choice(np.arange(len(distribution)), size=len(x_genes), p=distribution).astype(int)
-        sampled_values = values[sampled_indices]
-        sampled_xy = np.array([[int(x.split('|')[0]), int(x.split('|')[1])] for x in sampled_values])
         
-        x_genes_sampled = sampled_xy[:, 0]
-        y_genes_sampled = sampled_xy[:, 1]
 
-        #TODO make proper
-        gene_shape = offspring.genes[:, x_row_indices].shape
+        x_genes = offspring.genes[:, x_row_indices]
+        y_genes = offspring.genes[:, y_row_indices]
 
-        offspring.genes[:, x_row_indices] = x_genes_sampled.reshape(gene_shape)
-        offspring.genes[:, y_row_indices] = y_genes_sampled.reshape(gene_shape)
+        new_x_genes = np.zeros(x_genes.shape, dtype=np.int16)
+        new_y_genes = np.zeros(x_genes.shape, dtype=np.int16)
+
+        for i in range(len(x_genes)):
+            count_mat = np.zeros((self.reference_image.width, self.reference_image.height))
+            x_col, y_col = x_genes[i], y_genes[i]
+            for x, y in zip(x_col, y_col):
+                count_mat[x][y] += 1
+            probs = (count_mat/x_genes.shape[1]).flatten()
+
+            sampled_indices = np.random.choice(len(probs), size=x_genes.shape[1], p=probs)
+            sampled_x = sampled_indices // self.reference_image.height
+            sampled_y = sampled_indices // self.reference_image.width
 
 
-        ###############################################################################################
+            new_x_genes[i] = sampled_x
+            new_y_genes[i] = sampled_y
+
+        offspring.genes[:, x_row_indices] = new_x_genes
+        offspring.genes[:, y_row_indices] = new_y_genes
+
+        print("Sampled coord")
+        start_time = time.perf_counter()
+
+        end_time = time.perf_counter()
+
+        elapsed_time = end_time - start_time
+
+        print(f"Elapsed time: {elapsed_time} seconds")
+
+
 
         r_row_indices = rows + 2
         g_row_indices = rows + 3
         b_row_indices = rows + 4
 
-        r_genes = offspring.genes[:, r_row_indices].flatten()
-        g_genes = offspring.genes[:, g_row_indices].flatten()
-        b_genes = offspring.genes[:, b_row_indices].flatten()
+        r_genes = offspring.genes[:, r_row_indices]
+        g_genes = offspring.genes[:, g_row_indices]
+        b_genes = offspring.genes[:, b_row_indices]
 
-        probs_colour = {}
-        for r, g, b in zip(r_genes, g_genes, b_genes):
-            rgb = str(r)+'|'+str(g)+'|'+str(b)
-            probs_colour[rgb] = probs_colour.get(rgb, 0) + 1
-        probs_colour = {k:v/len(r_genes) for k, v in probs_colour.items()}
+        new_r_genes = np.zeros(r_genes.shape, dtype=np.int16)
+        new_g_genes = np.zeros(g_genes.shape, dtype=np.int16)
+        new_b_genes = np.zeros(b_genes.shape, dtype=np.int16)
 
-        distribution = np.array(list(probs_colour.values()))
-        values = np.array(list(probs_colour.keys()))
-        sampled_indices = np.random.choice(np.arange(len(distribution)), size=len(r_genes), p=distribution).astype(int)
-        sampled_values = values[sampled_indices]
-        sampled_rgb = np.array([[int(x.split('|')[0]), int(x.split('|')[1]), int(x.split('|')[2])] for x in sampled_values])
+        for i in range(len(r_genes)):
+            count_mat = np.zeros((256, 256, 256))
+            r_col, g_col, b_col = r_genes[i], g_genes[i], b_genes[i]
+            for r, g, b in zip(r_col, g_col, b_col):
+                count_mat[r][g][b] += 1
 
-        r_genes_sampled = sampled_rgb[:, 0]
-        g_genes_sampled = sampled_rgb[:, 1]
-        b_genes_sampled = sampled_rgb[:, 2]
+            probs = (count_mat/r_genes.shape[1]).flatten()
 
-        offspring.genes[:, r_row_indices] = r_genes_sampled.reshape(gene_shape)
-        offspring.genes[:, g_row_indices] = g_genes_sampled.reshape(gene_shape)
-        offspring.genes[:, b_row_indices] = b_genes_sampled.reshape(gene_shape)
+            sampled_indices = np.random.choice(len(probs), size=x_genes.shape[1], p=probs)
+
+            rgb = 256
+            sampled_r = sampled_indices // (rgb * rgb)
+            sampled_g = (sampled_indices // rgb) % rgb
+            sampled_b = sampled_indices % rgb
+
+            new_r_genes[i] = sampled_r
+            new_g_genes[i] = sampled_g
+            new_b_genes[i] = sampled_b
 
 
+        offspring.genes[:, r_row_indices] = new_r_genes
+        offspring.genes[:, g_row_indices] = new_g_genes
+        offspring.genes[:, b_row_indices] = new_b_genes
 
-        offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
-        offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
-                                           mutation_probability=self.mutation_probability,
-                                           num_features_mutation_strength=self.num_features_mutation_strength)
+
+        print("Sampled colour")
+
+
+        # increasing mutation probability makes sure we have enough possible combinations of x, y
+        # offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
+        # offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
+        #                                    mutation_probability=self.mutation_probability*self.population_size//2,
+        #                                    num_features_mutation_strength=self.num_features_mutation_strength)
 
         offspring.fitnesses = drawing_fitness_function(offspring.genes, self.reference_image)
 
@@ -246,6 +258,7 @@ class Evolution:
         self.population.stack(offspring)
 
         self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
+
 
     def run(self):
         data = []
@@ -302,12 +315,15 @@ class Evolution:
                      "time-elapsed": time.time() - start_time_seconds}, self)
 
             if 0 < self.generation_budget <= i_gen:
+                print("Final Generation")
                 break
             if 0 < self.evaluation_budget <= self.num_evaluations:
+                print("Eval budget converged")
                 break
 
             # check if evolution should terminate because optimum reached or population converged
             if self.population.is_converged():
+                print("Population converged")
                 break
 
         draw_voronoi_image(self.elite, self.reference_image.width, self.reference_image.height,
