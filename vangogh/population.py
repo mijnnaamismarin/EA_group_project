@@ -1,10 +1,12 @@
 import numpy as np
+from vangogh.util import REFERENCE_IMAGE
+from vangogh.util import NUM_VARIABLES_PER_POINT
 
 
 class Population:
     def __init__(self, population_size, genotype_length, initialization):
-        self.genes = np.empty(shape=(population_size, genotype_length), dtype=int)
-        self.fitnesses = np.zeros(shape=(population_size,))
+        self.genes = np.empty(shape = (population_size, genotype_length), dtype = int)
+        self.fitnesses = np.zeros(shape = (population_size,))
         self.initialization = initialization
 
     def initialize(self, feature_intervals):
@@ -13,9 +15,17 @@ class Population:
 
         if self.initialization == "RANDOM":
             for i in range(l):
-                init_feat_i = np.random.randint(low=feature_intervals[i][0],
-                                                        high=feature_intervals[i][1], size=n)
+                init_feat_i = np.random.randint(low = feature_intervals[i][0],
+                                                high = feature_intervals[i][1], size = n)
                 self.genes[:, i] = init_feat_i
+        elif self.initialization == "CRIT":
+            for i in range(l):
+                init_feat_i = np.random.randint(low = feature_intervals[i][0],
+                                                high = feature_intervals[i][1], size = n)
+                self.genes[:, i] = init_feat_i
+            # for j in range(l):
+            # self.genes[]
+
         else:
             raise Exception("Unknown initialization method")
 

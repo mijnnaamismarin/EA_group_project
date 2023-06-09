@@ -6,7 +6,7 @@ from scipy.spatial import KDTree
 from scipy.stats import chi2_contingency
 
 from vangogh.util import NUM_VARIABLES_PER_POINT
-
+from vangogh.util import REFERENCE_IMAGE
 QUERY_POINTS = []
 
 
@@ -25,7 +25,7 @@ def draw_voronoi_matrix(genotype, img_width, img_height, scale=1):
 
     voronoi_kdtree = KDTree(coords)
     if scale == 1:
-        query_points = QUERY_POINTS
+        query_points = [(x, y) for x in range(scaled_img_width) for y in range(scaled_img_height)]
     else:
         query_points = [(x, y) for x in range(scaled_img_width) for y in range(scaled_img_height)]
 
@@ -60,10 +60,25 @@ def compute_difference(genotype, reference_image: Image):
 def worker(args):
     return compute_difference(args[0], args[1])
 
-def drawing_fitness_function(genes, reference_image: Image):
+
+def drawing_fitness_function(genes, reference_image = REFERENCE_IMAGE):
     if len(QUERY_POINTS) == 0:
         QUERY_POINTS.extend([(x, y) for x in range(reference_image.width) for y in range(reference_image.height)])
 
     with Pool(min(max(cpu_count() - 1, 1), 4)) as p:
         fitness_values = list(p.map(worker, zip(genes, [reference_image] * genes.shape[0])))
     return np.array(fitness_values)
+
+
+def drawing_fitness_function_inverse(genes, reference_image = REFERENCE_IMAGE):
+    if len(QUERY_POINTS) == 0:
+        QUERY_POINTS.extend([(x, y) for x in range(reference_image.width) for y in range(reference_image.height)])
+
+    with Pool(min(max(cpu_count() - 1, 1), 4)) as p:
+        fitness_values = list(p.map(worker, zip(genes, [reference_image] * genes.shape[0])))
+    return np.array(fitness_values) ** -1
+
+
+def individual_fitness_inverse(genes, reference_image = REFERENCE_IMAGE):
+    fitness = worker((genes, reference_image))
+    return 1 / fitness
