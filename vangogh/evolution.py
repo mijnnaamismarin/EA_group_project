@@ -372,8 +372,7 @@ class Evolution:
             else:
                 raise ValueError('unknown evolution type:', self.evolution_type)
 
-            experiment_data.add_measurement(time.time() - start_time_seconds, np.mean(self.population.fitnesses),
-                                            self.elite_fitness)
+            experiment_data.add_measurement(time.time() - start_time_seconds, self.elite_fitness)
             # generation terminated
             i_gen += 1
             if self.verbose:

@@ -1,45 +1,121 @@
 import itertools
-from time import time
+import numpy as np
 
 from matplotlib import pyplot as plt
-
+from scipy.stats import mannwhitneyu, wilcoxon, ttest_ind
+from time import time
 from vangogh.experiment_module.experiment_data import ExperimentData
 
 
 class Experiment:
+    """
+    Class representing an experiment.
+
+    This class is responsible for running experiments, collecting data,
+    and plotting convergence.
+
+    Args:
+        experiment_name (str): The name of the experiment.
+        evo (object): The evolution object used for the experiment.
+
+    Attributes:
+        experiment_name (str): The name of the experiment.
+        evo (object): The evolution object used for the experiment.
+        experiment_data (list): A list to store experiment data.
+        experiment_time (list): A list to store the measurement time for each experiment.
+        total_experiment_time (list): A list to store the total runtime for each experiment.
+
+    """
 
     def __init__(self, experiment_name, evo):
         self.experiment_name = experiment_name
         self.evo = evo
-        self.experiment_data = []
+        self.experiments = []
         self.total_experiment_time = []
 
+    def print_experiment_info(self):
+        """Print a formatted overview of the experiment settings."""
+        print("Experiment Settings:")
+        print(f" - Number of Points: {self.evo.num_points}")
+        print(f" - Reference Image: {self.evo.reference_image}")
+        print(f" - Evolution Type: {self.evo.evolution_type}")
+        print(f" - Population Size: {self.evo.population_size}")
+        print(f" - Generation Budget: {self.evo.generation_budget}")
+        print(f" - Evaluation Budget: {self.evo.evaluation_budget}")
+        print(f" - Crossover Method: {self.evo.crossover_method}")
+        print(f" - Mutation Probability: {self.evo.mutation_probability}")
+        print(f" - Num Features Mutation Strength: {self.evo.num_features_mutation_strength}")
+        print(f" - Num Features Mutation Strength Decay: {self.evo.num_features_mutation_strength_decay}")
+        print(
+            f" - Num Features Mutation Strength Decay Generations: {self.evo.num_features_mutation_strength_decay_generations}")
+        print(f" - Selection Name: {self.evo.selection_name}")
+        print(f" - Initialization: {self.evo.initialization}")
+        print(f" - Noisy Evaluations: {self.evo.noisy_evaluations}")
+        print(f" - Verbose: {self.evo.verbose}")
+        print(f" - Generation Reporter: {self.evo.generation_reporter}")
+        print(f" - Learning Rate: {self.evo.learning_rate}")
+        print(f" - Negative Learning Rate: {self.evo.learning_rate_neg}")
+        print(f" - Seed: {self.evo.seed}")
+        print()
+
     def run_experiment(self, repeats=1, plot_converge=True, mode="generation"):
+        """
+        Run the experiment.
+
+        Args:
+            repeats (int): The number of times to repeat the experiment (default: 1).
+            plot_converge (bool): Whether to plot the convergence (default: True).
+            mode (str): The mode for plotting convergence, either "generation" or "time" (default: "generation").
+
+        """
+        self.clear_data()
+        self.print_experiment_info()
+
         for run_idx in range(repeats):
             start = time()
-            data_obj = ExperimentData()
-            self.evo.run(data_obj)
+            experiment_run = ExperimentData()
+
+            self.evo.run(experiment_run)
+
             self.total_experiment_time.append(time() - start)
-            self.experiment_data.append(data_obj)
+            self.experiments.append(experiment_run)
 
-            if plot_converge:
-                self.__plot_convergence(data_obj, run_idx, mode)
+            fitness = self.experiments[run_idx].get_elite_fitness()
+            total_time = self.total_experiment_time[run_idx]
 
-            cur_data = self.experiment_data[-1].get_data()
-            total_time = self.total_experiment_time[-1]
-            print(f"Average fitness {cur_data[1][-1]}")
-            print(f"Elite fitness {cur_data[2][-1]}")
+            print(f"Run #{run_idx + 1}")
+            print(f"Elite fitness {fitness}")
             print(f"Total Runtime {round(total_time, 2)} sec\n")
 
-    def run_hyperparameter_eval(self, hyperparameters, plot_converge=True, mode="generation"):
-        param_combinations = [
-            {key: value for key, value in zip(hyperparameters.keys(), combination)}
-            for combination in itertools.product(*hyperparameters.values())
-        ]
+        all_elite_fitness = [experiment.get_elite_fitness() for experiment in self.experiments]
+        average_elite_fitness = np.mean(all_elite_fitness, axis=0)
+        print(f"Average Elite Fitness over {repeats} runs: {average_elite_fitness}")
+
+        if plot_converge:
+            self.__plot_convergence(repeats, mode)
+
+        result = np.mean([experiment.get_fitness_data() for experiment in self.experiments], axis=0)
+
+        return result
+
+    def hyperparameter_search(self, hyperparameters, repeats=1, plot_converge=True, plot=True):
+        """
+        Run hyperparameter search.
+
+        Args:
+            hyperparameters (dict): A dictionary of hyperparameters to evaluate.
+            repeats (int): The number of times to repeat the experiment (default: 1).
+            plot_converge (bool): Whether to plot the convergence (default: True).
+            mode (str): The mode for plotting convergence, either "generation" or "time" (default: "generation").
+            plot (bool): Whether to plot the comparison.
+
+        """
+        param_combinations = [{key: value for key, value in zip(hyperparameters.keys(), combination)}
+                              for combination in itertools.product(*hyperparameters.values())]
 
         best = None
         best_score = 0
-
+        all_results = []
         original_name = self.experiment_name
 
         for experiment in param_combinations:
@@ -49,9 +125,13 @@ class Experiment:
                 param_name += f"{param}_{experiment[param]}_"
 
             self.experiment_name = f"{original_name}_{param_name}"
-            self.run_experiment(plot_converge=plot_converge, mode=mode)
 
-            new_score = self.experiment_data[-1].get_data()[2][-1]
+            print(f"Running new experiment: {self.experiment_name}\n")
+
+            results = self.run_experiment(repeats, plot_converge=plot_converge, mode="generation")
+
+            all_results.append(results)
+            new_score = results[-1]
 
             if best is None:
                 best = self.experiment_name
@@ -64,23 +144,137 @@ class Experiment:
 
         print(f"Best hyperparameters found: {best} with score {best_score}")
 
-    def get_results(self):
-        return self.experiment_data, self.total_experiment_time
+        if plot:
+            self.__plot_hs_convergence(all_results, param_combinations)
 
-    def __plot_convergence(self, data_obj, run_idx, mode):
-        measurement_time, average_fitness, elite_fitness = data_obj.get_data()
-        generations = list(range(len(average_fitness)))
+        return all_results
+
+    def get_results(self):
+        """
+        Get the experiment results.
+
+        Returns:
+            tuple: A tuple containing the experiment data and total experiment time.
+
+        """
+        return self.experiments, self.total_experiment_time
+
+    def __plot_convergence(self, repeats, mode):
+        """
+        Plot the convergence.
+
+        Args:
+            repeats (int): The number of experiment repeats.
+            mode (str): The mode for plotting convergence, either "generation" or "time".
+
+        """
+        fitness_arrays = [experiment.get_fitness_data() for experiment in self.experiments]
+        time = [experiment.get_measurement_time() for experiment in self.experiments]
+
+        average_elite_fitness = np.mean(fitness_arrays, axis=0)
+        std_deviations = np.std(fitness_arrays, axis=0)
+
+        generations = list(range(len(average_elite_fitness)))
+        time = np.mean(time, axis=0)
 
         if mode == "generation":
-            plt.plot(generations, average_fitness)
-            plt.plot(generations, elite_fitness)
+            plt.plot(generations, average_elite_fitness)
+            plt.fill_between(generations, average_elite_fitness - std_deviations,
+                             average_elite_fitness + std_deviations, alpha=0.3, label='Standard Deviation')
             plt.xlabel('Generations')
         elif mode == "time":
-            plt.plot(measurement_time, average_fitness)
-            plt.plot(measurement_time, elite_fitness)
+            plt.plot(time, average_elite_fitness)
+            plt.fill_between(time, average_elite_fitness - std_deviations, average_elite_fitness + std_deviations,
+                             alpha=0.3, label='Standard Deviation')
             plt.xlabel('Time(s)')
 
-        plt.title(f'Convergence Plot for {self.experiment_name} - run #{run_idx + 1}')
+        plt.title(f'Convergence Plot for {self.experiment_name} - #repeats={repeats}')
         plt.ylabel('Fitness Score')
-        plt.legend(['Average Fitness', 'Elite Fitness'])
+        plt.legend(['Elite Fitness'])
         plt.show()
+
+    def __plot_hs_convergence(self, all_results, param_combinations):
+        """
+        Plot the convergence plots for a hyperparameter study.
+
+        Args:
+            all_results (list[ndarray]): A list of fitness scores for each generation, for each set of hyperparameters.
+            param_combinations (list): A list of hyperparameter combinations.
+        """
+        generations = list(range(len(all_results[0])))
+
+        for fitness, param in zip(all_results, param_combinations):
+            plt.plot(generations, fitness, label=str(param))
+
+        plt.xlabel('Generations')
+        plt.title(f'Convergence Plots for Hyperparameter Study')
+        plt.ylabel('Fitness Score')
+        plt.legend(bbox_to_anchor=(1.04, 0), loc="lower left", borderaxespad=0)
+        plt.show()
+
+    def clear_data(self):
+        """
+        Clear the data stored in the class variables.
+        """
+        self.experiments = []
+        self.total_experiment_time = []
+
+
+def compare_experiments(experiment_1, experiment_2, significance_level, plot=True, test="mannwhitneyu"):
+    """
+    Compare two time series using a pairwise test.
+
+    Args:
+        experiment_1 (ndarray): First time series.
+        experiment_2 (ndarray): Second time series.
+        significance_level (float): Significance level for the statistical test.
+        plot (bool): Whether to plot the comparison.
+        test (str): Statistical test.
+
+    Returns:
+        str: The result of the hypothesis test, either to 'Reject' or 'Retain'.
+
+    """
+
+    if test == "wilcoxon":  # Paired independent observations
+        test_result = wilcoxon(experiment_1, experiment_2)
+    elif test == "mannwhitneyu":  # Independent tests
+        test_result = mannwhitneyu(experiment_1, experiment_2)
+    else:
+        test_result = ttest_ind(experiment_1, experiment_2)  # Normal distribution assumption
+
+    if plot:
+        plot_compare_convergence(experiment_1, experiment_2)
+
+    # The null hypothesis is a statement or assumption that suggests there is
+    # no significant difference or relationship between the variables being compared.
+    #
+    # Reject: Significant difference.
+    # Retain: Not enough evidence to support an alternative hypothesis
+
+    if test_result.pvalue < significance_level:
+        return test_result.pvalue, 'Null hypothesis rejected'
+    else:
+        return test_result.pvalue, 'Null hypothesis retained'
+
+
+def plot_compare_convergence(experiment_1, experiment_2):
+    """
+    Plot the convergence of 2 series.
+
+    Args:
+        experiment_1 (ndarray): First time series.
+        experiment_2 (ndarray): Second time series.
+
+    """
+
+    generations = list(range(len(experiment_1)))
+
+    plt.plot(generations, experiment_1)
+    plt.plot(generations, experiment_2)
+    plt.xlabel('Generations')
+
+    plt.title(f'Convergence Plot Comparing Two Alternatives ')
+    plt.ylabel('Fitness Score')
+    plt.legend(['Elite Fitness'])
+    plt.show()

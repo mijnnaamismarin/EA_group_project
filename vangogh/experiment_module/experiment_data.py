@@ -1,16 +1,19 @@
 class ExperimentData:
 
     def __init__(self):
-        self.measurement_time = []
-        self.average_fitness = []
-        self.elite_fitness = []
+        self.__measurement_time = []
+        self.__fitness_data = []
 
-    def add_measurement(self, time, average, elite):
-        self.measurement_time.append(time)
-        self.average_fitness.append(average)
-        self.elite_fitness.append(elite)
+    def add_measurement(self, time, elite):
+        self.__measurement_time.append(time)
+        self.__fitness_data.append(elite)
 
-    def get_data(self):
-        return self.measurement_time, \
-            self.average_fitness, \
-            self.elite_fitness
+    def get_measurement_time(self):
+        return self.__measurement_time
+
+    def get_fitness_data(self):
+        return self.__fitness_data
+
+    def get_elite_fitness(self):
+        return self.__fitness_data[-1]
+
