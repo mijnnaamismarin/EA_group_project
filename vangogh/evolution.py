@@ -250,10 +250,9 @@ class Evolution:
         self.population.stack(offspring)
         self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
 
-
-    def run(self):
+    def run(self, experiment_data):
         data = []
-
+        self.population = Population(self.population_size, self.genotype_length, self.initialization)
         self.population.initialize(self.feature_intervals)
 
         self.population.fitnesses = drawing_fitness_function(self.population.genes,
@@ -277,8 +276,19 @@ class Evolution:
 
             if self.evolution_type == 'classic':
                 self.__classic_generation(merge_parent_offspring=False)
+            elif self.evolution_type == 'PBIL':
+                self.probabilities = np.empty(self.genotype_length, dtype=object)
+                for i in range(self.genotype_length):
+                    hist, bins = np.histogram(self.population.genes[:, i], bins=self.feature_intervals[i][1],
+                                              range=(self.feature_intervals[i][0], self.feature_intervals[i][1]),
+                                              density=True)
+                    self.probabilities[i] = hist / np.sum(hist)
+
+                self.__pbil_generation()
             elif self.evolution_type == 'UMDA':
                 self.__umda_generation()
+            elif self.evolution_type == 'cGA':
+                self.__cga_generation()
             elif self.evolution_type == 'PFDA':
                 self.__pfda_generation()
             elif self.evolution_type == 'p+o':
@@ -286,6 +296,8 @@ class Evolution:
             else:
                 raise ValueError('unknown evolution type:', self.evolution_type)
 
+            experiment_data.add_measurement(time.time() - start_time_seconds, np.mean(self.population.fitnesses),
+                                            self.elite_fitness)
             # generation terminated
             i_gen += 1
             if self.verbose:
@@ -306,15 +318,12 @@ class Evolution:
                      "time-elapsed": time.time() - start_time_seconds}, self)
 
             if 0 < self.generation_budget <= i_gen:
-                print("Final Generation")
                 break
             if 0 < self.evaluation_budget <= self.num_evaluations:
-                print("Eval budget converged")
                 break
 
             # check if evolution should terminate because optimum reached or population converged
             if self.population.is_converged():
-                print("Population converged")
                 break
 
         draw_voronoi_image(self.elite, self.reference_image.width, self.reference_image.height,
