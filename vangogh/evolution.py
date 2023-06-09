@@ -10,6 +10,8 @@ from vangogh.fitness import drawing_fitness_function, draw_voronoi_image
 from vangogh.population import Population
 from vangogh.util import NUM_VARIABLES_PER_POINT, IMAGE_SHRINK_SCALE, REFERENCE_IMAGE
 
+from collections import defaultdict
+
 
 class Evolution:
     def __init__(self,
@@ -138,7 +140,7 @@ class Evolution:
 
         self.population = selection.select(self.population, self.population_size,
                                            selection_name=self.selection_name)
-
+        
     def __umda_generation(self):
         offspring = Population(self.population_size, self.genotype_length, self.initialization)
         offspring.genes[:] = self.population.genes[:]
@@ -230,6 +232,99 @@ class Evolution:
 
 
 
+    def __pfda_generation(self):
+        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        offspring.genes[:] = self.population.genes[:]
+        offspring.shuffle()
+
+        rows = np.array([i for i in range(0, self.genotype_length, NUM_VARIABLES_PER_POINT)])
+        x_row_indices = rows
+        y_row_indices = rows + 1
+        
+
+        x_genes = offspring.genes[:, x_row_indices]
+        y_genes = offspring.genes[:, y_row_indices]
+
+        new_x_genes = np.zeros(x_genes.shape, dtype=np.int16)
+        new_y_genes = np.zeros(y_genes.shape, dtype=np.int16)
+
+        for i in range(x_genes.shape[1]):
+            count_mat = np.zeros((self.reference_image.width, self.reference_image.height+1))
+            
+            x_col, y_col = x_genes[:, i], y_genes[:, i]
+
+            for x, y in zip(x_col, y_col):
+                count_mat[x][y] += 1
+            
+            probs = (count_mat/x_genes.shape[0]).flatten()
+            sampled_indices = np.random.choice(len(probs), size=x_genes.shape[0], p=probs)
+            sampled_x = sampled_indices // self.reference_image.width
+            sampled_y = sampled_indices % self.reference_image.height
+
+            new_x_genes[:, i] = sampled_x
+            new_y_genes[:, i] = sampled_y
+            
+
+        offspring.genes[:, x_row_indices] = new_y_genes
+        offspring.genes[:, y_row_indices] = new_x_genes
+
+
+        r_row_indices = rows + 2
+        g_row_indices = rows + 3
+        b_row_indices = rows + 4
+
+        r_genes = offspring.genes[:, r_row_indices]
+        g_genes = offspring.genes[:, g_row_indices]
+        b_genes = offspring.genes[:, b_row_indices]
+
+        new_r_genes = np.zeros(r_genes.shape, dtype=np.int16)
+        new_g_genes = np.zeros(g_genes.shape, dtype=np.int16)
+        new_b_genes = np.zeros(b_genes.shape, dtype=np.int16)
+
+        for i in range(r_genes.shape[1]):
+            r_col, g_col, b_col = r_genes[:, i], g_genes[:, i], b_genes[:, i]
+            count_dict = {}
+            for r, g, b in zip(r_col, g_col, b_col):
+                key = str(r)+'|'+str(g)+'|'+str(b)
+                count_dict[key] = count_dict.get(key, 0) + 1
+
+            total_values = r_genes.shape[0]
+            probs = {k: v/total_values for k, v in count_dict.items()}
+                        
+            distribution = np.array(list(probs.values()))
+            values = np.array(list(probs.keys()))
+            sampled_indices = np.random.choice(np.arange(len(distribution)), size=r_genes.shape[0], p=distribution)
+            sampled_values = values[sampled_indices]
+            sampled_rgb = np.array([[int(x.split('|')[0]), int(x.split('|')[1]), int(x.split('|')[2])] for x in sampled_values])
+
+            sampled_r = sampled_rgb[:, 0]
+            sampled_g = sampled_rgb[:, 1]
+            sampled_b = sampled_rgb[:, 2]
+
+            new_r_genes[:, i] = sampled_r
+            new_g_genes[:, i] = sampled_g
+            new_b_genes[:, i] = sampled_b
+
+
+        offspring.genes[:, r_row_indices] = new_r_genes
+        offspring.genes[:, g_row_indices] = new_g_genes
+        offspring.genes[:, b_row_indices] = new_b_genes
+
+
+        offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
+        offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
+                                           mutation_probability=self.mutation_probability,
+                                           num_features_mutation_strength=self.num_features_mutation_strength)
+
+        offspring.fitnesses = drawing_fitness_function(offspring.genes, self.reference_image)
+
+        self.num_evaluations += len(offspring.genes)
+
+        self.__update_elite(offspring)
+
+        self.population.stack(offspring)
+        self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
+
     def run(self, experiment_data):
         data = []
         self.population = Population(self.population_size, self.genotype_length, self.initialization)
@@ -270,6 +365,8 @@ class Evolution:
             elif self.evolution_type == 'cGA':
                 self.probabilities = np.mean(self.population.genes, axis=0)
                 self.__cga_generation()
+            elif self.evolution_type == 'PFDA':
+                self.__pfda_generation()
             elif self.evolution_type == 'p+o':
                 self.__classic_generation(merge_parent_offspring=True)
             else:
