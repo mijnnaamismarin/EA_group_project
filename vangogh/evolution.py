@@ -29,8 +29,8 @@ class Evolution:
                  noisy_evaluations=False,
                  verbose=False,
                  generation_reporter=None,
-                 PBIL_learning_rate=0.1,
-                 PBIL_learning_rate_neg=0.075,
+                 learning_rate=0.1,
+                 learning_rate_neg=0.075,
                  seed=0):
 
         self.probabilities = None
@@ -67,8 +67,8 @@ class Evolution:
         self.crossover_method = crossover_method
         self.num_evaluations = 0
         self.initialization = initialization
-        self.PBIL_learning_rate = PBIL_learning_rate
-        self.PBIL_learning_rate_neg = PBIL_learning_rate_neg
+        self.learning_rate = learning_rate
+        self.learning_rate_neg = learning_rate_neg
 
         np.random.seed(seed)
         self.seed = seed
@@ -145,8 +145,8 @@ class Evolution:
         offspring.shuffle()
 
         for i in range(self.genotype_length):
-            hist, bins = np.histogram(offspring.genes[:, i], bins=256, range=(0, 256), density=True)
-            distribution = hist / np.sum(hist)
+            hist, bins = np.histogram(offspring.genes[:, i], bins=self.feature_intervals[i][1], range=(self.feature_intervals[i][0], self.feature_intervals[i][1]), density=True)
+            distribution = (hist+0.0001) / np.sum(hist+0.0001)
             offspring.genes[:, i] = np.random.choice(np.arange(len(distribution)), size=self.population_size,
                                                      p=distribution).astype(int)
 
@@ -176,8 +176,8 @@ class Evolution:
                                       range=(self.feature_intervals[i][0], self.feature_intervals[i][1]), density=True)
             parent_probability = hist / np.sum(hist)
 
-            self.probabilities[i] = (1.0 - self.PBIL_learning_rate) * self.probabilities[i] \
-                                    + self.PBIL_learning_rate * parent_probability
+            self.probabilities[i] = (1.0 - self.learning_rate) * self.probabilities[i] \
+                                    + self.learning_rate * parent_probability
 
             mut_shift = 0.05
             mut_prob = 0.02
@@ -201,8 +201,34 @@ class Evolution:
 
         self.population = offspring
 
-    def __cga_generation(self):
-        pass
+    def __pbil_paper_generation(self):
+        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+
+        for i in range(self.population_size):
+            for j in range(self.genotype_length):
+                offspring.genes[i, j] = np.random.normal(self.probabilities[j], 30, 1)
+                offspring.genes[i, j] = np.clip(offspring.genes[i, j],
+                                                self.feature_intervals[j][0],
+                                                self.feature_intervals[j][1])
+
+        offspring.fitnesses = drawing_fitness_function(offspring.genes, self.reference_image)
+
+        sort_order = np.argsort(offspring.fitnesses)
+        offspring.genes = offspring.genes[sort_order, :]
+        offspring.fitnesses = offspring.fitnesses[sort_order]
+
+        for j in range(self.population_size):
+            for i in range(self.genotype_length):
+                self.probabilities[i] = self.probabilities[i] * (1.0 - self.learning_rate) + \
+                                        offspring.genes[j][i] * self.learning_rate
+
+        current_solution = Population(1, self.genotype_length, self.initialization)
+        current_solution.genes[:] = self.probabilities.astype(int)
+        current_solution.fitnesses = drawing_fitness_function(current_solution.genes, self.reference_image)
+        self.__update_elite(current_solution)
+        self.population = offspring
+
+
 
     def run(self, experiment_data):
         data = []
@@ -242,6 +268,7 @@ class Evolution:
             elif self.evolution_type == 'UMDA':
                 self.__umda_generation()
             elif self.evolution_type == 'cGA':
+                self.probabilities = np.mean(self.population.genes, axis=0)
                 self.__cga_generation()
             elif self.evolution_type == 'p+o':
                 self.__classic_generation(merge_parent_offspring=True)
