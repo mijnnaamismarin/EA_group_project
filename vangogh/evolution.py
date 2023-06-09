@@ -407,3 +407,6 @@ class Evolution:
             .save(
             f"./img/van_gogh_final_{self.seed}_{self.population_size}_{self.crossover_method}_{self.num_points}_{self.initialization}_{self.generation_budget}.png")
         return data
+
+    def __cga_generation(self):
+        pass
