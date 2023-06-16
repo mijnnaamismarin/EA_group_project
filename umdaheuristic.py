@@ -7,14 +7,46 @@ from vangogh.util import *
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy as sp
+from multiprocess import Pool, cpu_count
+from time import time
+from tqdm import tqdm
+
+
+def worker_2(args, tol = 5):
+    opt = sp.optimize.minimize(individual_fitness, x0 = np.array(args[2]), tol = tol, args = (np.array(args[1])))
+    print("MIN DONE")
+    print(opt.nfev)
+    return [opt.x, opt.nfev]
 
 
 def find_local_max(initial_population):
-    local_converged_population = np.zeros(initial_population.genes.shape)
-    for i in range(len(initial_population.genes)):
-        local_converged_population[i] = sp.optimize.minimize(individual_fitness_inverse,
-                                                             x0 = initial_population.genes[i], tol = 1).x
-    return local_converged_population
+    pixel_loc, pixel_colour = pixel_seperate(initial_population.genes)
+    ziplet = list(zip(range(pixel_loc.shape[0]), pixel_loc.tolist(), pixel_colour.tolist()))
+    with Pool(min(max(cpu_count() - 1, 1), 4)) as p:
+        result = p.map(worker_2, ziplet)
+    return result
+
+
+# Seperate pixel locations from pixel colours
+def pixel_seperate(genes):
+    pixel_loc = np.zeros((len(genes), 2 * num_points))
+    pixel_colour = np.zeros((len(genes), 3 * num_points))
+    for i in range(len(genes)):
+        a = genes[i].reshape((-1, 5))
+        b = np.hsplit(a, [2])
+        pixel_loc[i] = b[0].reshape(-1)
+        pixel_colour[i] = b[1].reshape(-1)
+    return pixel_loc, pixel_colour
+
+
+# Join pixel locations with pixel colours
+def pixel_join(pixel_loc, pixel_colour):
+    genes = np.zeros((len(pixel_loc), len(pixel_loc[0]) + len(pixel_colour[0])))
+    for i in range(len(pixel_loc)):
+        a = pixel_loc[i].reshape((-1, 2))
+        b = pixel_colour[i].reshape((-1, 3))
+        genes[i] = np.hstack((a, b)).reshape(-1)
+    return genes
 
 
 # Function to estimate probabilities of the selected population
@@ -52,7 +84,7 @@ if __name__ == "__main__":
     plt.ion()  # Turn on interactive mode for plt
 
     # Problem parameters
-    population_size = 12
+    population_size = 500
     num_points = 100
     genotype_length = 5 * num_points
     reference_image = Image.open("img/reference_image_resized.jpg")
@@ -63,16 +95,28 @@ if __name__ == "__main__":
     population = Population(population_size = population_size, genotype_length = genotype_length,
                             initialization = "RANDOM")
     population.initialize(feature_intervals = feature_intervals)
+    pixel_loc, pixel_colour = pixel_seperate(population.genes)
+    t1_start = time()
+    result = find_local_max(population)
+    refined_colours = np.zeros((len(result), 3 * num_points))
+    evals = np.zeros((len(result), 1))
+    for i in range(len(result)):
+        refined_colours[i] = result[i][0]
+        evals[i] = result[i][1]
 
-    population.genes = find_local_max(population)
+    population.genes = np.array(pixel_join(pixel_loc, refined_colours))
+    t1_stop = time()
     print("Initialization complete")
+    print("Elapsed time during the initialization:",
+          t1_stop - t1_start)
+    print(f"Total number of evaluations: {np.sum(evals)}")
     # Selection parameters
-    selection_size = 8
+    selection_size = 440
     tournament_size = 4
     num_generations = 300
 
     # Main loop for evolution process
-    for generation in range(num_generations):
+    for generation in tqdm(range(num_generations)):
         # Fitness computation
         population.fitnesses = drawing_fitness_function(population.genes)
 

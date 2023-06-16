@@ -79,6 +79,14 @@ def drawing_fitness_function_inverse(genes, reference_image = REFERENCE_IMAGE):
     return np.array(fitness_values) ** -1
 
 
-def individual_fitness_inverse(genes, reference_image = REFERENCE_IMAGE):
-    fitness = worker((genes, reference_image))
-    return 1 / fitness
+# Join pixel locations with pixel colours
+def pixel_join_indv(pixel_loc, pixel_colour):
+    a = pixel_loc.reshape((-1, 2))
+    b = pixel_colour.reshape((-1, 3))
+    gene = np.hstack((a, b)).reshape(-1)
+    return gene
+
+
+def individual_fitness(pixel_colour, pixel_loc, reference_image = REFERENCE_IMAGE):
+    fitness = worker((pixel_join_indv(pixel_loc, pixel_colour), reference_image))
+    return fitness

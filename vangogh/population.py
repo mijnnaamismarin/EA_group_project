@@ -1,4 +1,5 @@
 import numpy as np
+
 from vangogh.util import REFERENCE_IMAGE
 from vangogh.util import NUM_VARIABLES_PER_POINT
 
