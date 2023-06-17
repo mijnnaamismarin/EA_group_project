@@ -4,10 +4,13 @@ import numpy as np
 from PIL import Image
 from multiprocess import Pool, cpu_count
 
-from vangogh import selection, variation
-from vangogh.fitness import drawing_fitness_function, draw_voronoi_image
-from vangogh.population import Population
-from vangogh.util import NUM_VARIABLES_PER_POINT, IMAGE_SHRINK_SCALE, REFERENCE_IMAGE
+# from selection.py in the same directory import all its functions
+from selection import * 
+from variation import *
+
+from fitness import drawing_fitness_function, draw_voronoi_image
+from population import Population
+from util import NUM_VARIABLES_PER_POINT, IMAGE_SHRINK_SCALE, REFERENCE_IMAGE
 
 
 class Evolution:
@@ -111,8 +114,8 @@ class Evolution:
 		offspring.genes[:] = self.population.genes[:]
 		offspring.shuffle()
 		# variation
-		offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
-		offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
+		offspring.genes = crossover(offspring.genes, self.crossover_method)
+		offspring.genes = mutate(offspring.genes, self.feature_intervals,
 										   mutation_probability = self.mutation_probability,
 										   num_features_mutation_strength = self.num_features_mutation_strength)
 		# evaluate offspring
@@ -130,7 +133,7 @@ class Evolution:
 			# just replace the entire thing
 			self.population = offspring
 
-		self.population = selection.select(self.population, self.population_size,
+		self.population = select(self.population, self.population_size,
 										   selection_name = self.selection_name)
 
 	def run(self):
@@ -206,7 +209,7 @@ if __name__ == '__main__':
 					population_size = 100,
 					generation_budget = 300,
 					crossover_method = 'ONE_POINT',
-					initialization = 'RANDOM',
+					initialization = 'PARTIAL_LOCAL_OPT',
 					num_features_mutation_strength = .25,
 					num_features_mutation_strength_decay = None,
 					num_features_mutation_strength_decay_generations = None,

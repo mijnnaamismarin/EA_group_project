@@ -5,7 +5,7 @@ from multiprocess import Pool, cpu_count
 from scipy.spatial import KDTree
 from scipy.stats import chi2_contingency
 
-from vangogh.util import NUM_VARIABLES_PER_POINT, REFERENCE_IMAGE
+from util import NUM_VARIABLES_PER_POINT, REFERENCE_IMAGE
 
 QUERY_POINTS = []
 
