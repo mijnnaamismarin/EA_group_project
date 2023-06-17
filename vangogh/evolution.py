@@ -31,7 +31,8 @@ class Evolution:
 				 noisy_evaluations = False,
 				 verbose = False,
 				 generation_reporter = None,
-				 seed = 0):
+				 seed = 0,
+				 opt_fraction = 0.2):
 
 		self.reference_image: Image = reference_image.copy()
 		self.reference_image.thumbnail((int(self.reference_image.width / IMAGE_SHRINK_SCALE),
@@ -66,6 +67,7 @@ class Evolution:
 		self.crossover_method = crossover_method
 		self.num_evaluations = 0
 		self.initialization = initialization
+		self.opt_fraction = opt_fraction
 
 		np.random.seed(seed)
 		self.seed = seed
@@ -139,7 +141,7 @@ class Evolution:
 	def run(self):
 		data = []
 
-		self.population.initialize(self.feature_intervals)
+		self.population.initialize(self.feature_intervals, opt_fraction = self.opt_fraction)
 
 		self.population.fitnesses = drawing_fitness_function(self.population.genes,
 															 self.reference_image)
@@ -215,5 +217,6 @@ if __name__ == '__main__':
 					num_features_mutation_strength_decay_generations = None,
 					selection_name = 'tournament_4',
 					noisy_evaluations = False,
-					verbose = True)
+					verbose = True,
+					opt_fraction=0.2)
 	evo.run()
