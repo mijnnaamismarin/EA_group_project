@@ -84,7 +84,7 @@ class Evolution:
 
 		# set up population and elite
 		self.genotype_length = len(feature_intervals)
-		self.population = Population(self.population_size, self.genotype_length, self.initialization)
+		self.population = Population(self.population_size, self.genotype_length, self.initialization, opt_fraction = self.opt_fraction)
 		self.elite = None
 		self.elite_fitness = np.inf
 
@@ -112,7 +112,7 @@ class Evolution:
 
 	def __classic_generation(self, merge_parent_offspring = False):
 		# create offspring population
-		offspring = Population(self.population_size, self.genotype_length, self.initialization)
+		offspring = Population(self.population_size, self.genotype_length, self.initialization, opt_fraction = self.opt_fraction)
 		offspring.genes[:] = self.population.genes[:]
 		offspring.shuffle()
 		# variation
@@ -141,7 +141,7 @@ class Evolution:
 	def run(self):
 		data = []
 
-		self.population.initialize(self.feature_intervals, opt_fraction = self.opt_fraction)
+		self.population.initialize(self.feature_intervals)
 
 		self.population.fitnesses = drawing_fitness_function(self.population.genes,
 															 self.reference_image)
@@ -218,5 +218,5 @@ if __name__ == '__main__':
 					selection_name = 'tournament_4',
 					noisy_evaluations = False,
 					verbose = True,
-					opt_fraction=0.2)
+					opt_fraction=0.75)
 	evo.run()
