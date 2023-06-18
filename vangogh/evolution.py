@@ -114,7 +114,7 @@ class Evolution:
     def __classic_generation(self, merge_parent_offspring=False):
         # create offspring population
         #offspring = Population(self.population_size, self.genotype_length, self.initialization)###
-        print(f"num population:{self.population.genes.shape[0]}")
+        #print(f"num population:{self.population.genes.shape[0]}")
         offspring = Population(self.population.genes.shape[0], self.genotype_length, self.initialization)###
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
@@ -140,8 +140,8 @@ class Evolution:
         
         self.population = selection.select(self.population, self.population_size,
                                            selection_name=self.selection_name)
-        # self.population.fitnesses = drawing_fitness_function(self.population.genes,
-        #                                                self.reference_image)  ###jin
+        self.population.fitnesses = drawing_fitness_function(self.population.genes,
+                                                       self.reference_image)  ###jin
         self.__update_elite(self.population)###jin
 
     def __umda_generation(self):
