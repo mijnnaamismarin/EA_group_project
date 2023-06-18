@@ -142,7 +142,7 @@ class Evolution:
                                            selection_name=self.selection_name)
         # self.population.fitnesses = drawing_fitness_function(self.population.genes,
         #                                                self.reference_image)  ###jin
-        #self.__update_elite(self.population)###jin
+        self.__update_elite(self.population)###jin
 
     def __umda_generation(self):
         offspring = Population(self.population_size, self.genotype_length, self.initialization)
