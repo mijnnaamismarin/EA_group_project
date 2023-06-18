@@ -127,7 +127,7 @@ class Evolution:
     def __classic_generation(self, merge_parent_offspring=False):
         # create offspring population
         offspring = Population(self.population_size, self.genotype_length, self.initialization,
-                               opt_fraction=self.opt_fraction)
+                               self.opt_fraction)
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
         # variation
@@ -155,7 +155,7 @@ class Evolution:
 
 
     def __umda_generation(self):
-        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        offspring = Population(self.population_size, self.genotype_length, self.initialization, self.opt_fraction)
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
 
@@ -177,7 +177,7 @@ class Evolution:
         self.population = select(self.population, self.population_size, selection_name=self.selection_name)
 
     def __umda_mutation_generation(self):
-        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        offspring = Population(self.population_size, self.genotype_length, self.initialization, self.opt_fraction)
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
 
@@ -205,7 +205,7 @@ class Evolution:
         self.population = select(self.population, self.population_size, selection_name=self.selection_name)
 
     def __kernel_density_rgb_generation(self):
-        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        offspring = Population(self.population_size, self.genotype_length, self.initialization, self.opt_fraction)
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
 
@@ -254,7 +254,7 @@ class Evolution:
                                            selection_name=self.selection_name)
 
     def __pbil_generation(self):
-        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        offspring = Population(self.population_size, self.genotype_length, self.initialization, self.opt_fraction)
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
 
@@ -296,7 +296,7 @@ class Evolution:
 
 
     def __pfda_generation(self):
-        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        offspring = Population(self.population_size, self.genotype_length, self.initialization, self.opt_fraction)
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
 
@@ -373,7 +373,7 @@ class Evolution:
 
     def run(self, experiment_data):
         data = []
-        self.population = Population(self.population_size, self.genotype_length, self.initialization)
+        self.population = Population(self.population_size, self.genotype_length, self.initialization, self.opt_fraction)
         self.population.initialize(self.feature_intervals)
 
         self.population.fitnesses = drawing_fitness_function(self.population.genes,
@@ -464,13 +464,13 @@ if __name__ == '__main__':
                     population_size = 100,
                     generation_budget = 300,
                     crossover_method = 'ONE_POINT',
-                    initialization = 'PARTIAL_LOCAL_OPT_LOAD',
+                    initialization = 'PARTIAL_LOCAL_OPT',
                     num_features_mutation_strength = .25,
                     num_features_mutation_strength_decay = None,
                     num_features_mutation_strength_decay_generations = None,
                     selection_name = 'tournament_4',
                     noisy_evaluations = False,
                     verbose = True,
-                    opt_fraction=0.25)
+                    opt_fraction=0.5)
     
     evo.run(ExperimentData())

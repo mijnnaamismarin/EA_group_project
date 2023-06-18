@@ -10,7 +10,7 @@ from multiprocessing import Pool, cpu_count
 
 # Class to represent a population
 class Population:
-    def __init__(self, population_size, genotype_length, initialization, opt_fraction=0.2):
+    def __init__(self, population_size, genotype_length, initialization, opt_fraction=0.0):
         # Initialize the population
         self.genes = np.empty(shape=(population_size, genotype_length), dtype=int)
         self.fitnesses = np.zeros(shape=(population_size,))
