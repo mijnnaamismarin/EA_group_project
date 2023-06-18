@@ -1,5 +1,6 @@
 # Evolutionary Van Gogh
 
+Repository of group 5 
 
 ## Installation
 
