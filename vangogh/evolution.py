@@ -5,6 +5,7 @@ from PIL import Image
 
 from sklearn.neighbors import KernelDensity
 
+from vangogh.experiment_module.experiment_data import ExperimentData
 from vangogh.population import Population
 from vangogh.selection import select
 from vangogh.variation import crossover, mutate
@@ -35,7 +36,7 @@ class Evolution:
                  learning_rate=0.1,
                  learning_rate_neg=0.075,
                  seed=0,
-                 opt_fraction = 0.2):
+                 opt_fraction=0.2):
 
         def warn(*args, **kwargs):
             pass
@@ -50,7 +51,6 @@ class Evolution:
                                         int(self.reference_image.height / IMAGE_SHRINK_SCALE)),
                                        Image.ANTIALIAS)
         self.reference_image_array = np.asarray(self.reference_image)
-
 
         num_variables = num_points * NUM_VARIABLES_PER_POINT
         feature_intervals = []
@@ -88,7 +88,7 @@ class Evolution:
 
         # set feature intervals to be a np.array
         if type(feature_intervals) != np.array:
-            self.feature_intervals = np.array(feature_intervals, dtype = object)
+            self.feature_intervals = np.array(feature_intervals, dtype=object)
 
         # check that tournament size is compatible
         if 'tournament' in selection_name:
@@ -98,7 +98,8 @@ class Evolution:
 
         # set up population and elite
         self.genotype_length = len(feature_intervals)
-        self.population = Population(self.population_size, self.genotype_length, self.initialization, opt_fraction = self.opt_fraction)
+        self.population = Population(self.population_size, self.genotype_length, self.initialization,
+                                     opt_fraction=self.opt_fraction)
         self.elite = None
         self.elite_fitness = np.inf
 
@@ -123,7 +124,6 @@ class Evolution:
         if self.noisy_evaluations or best_fitness < self.elite_fitness:
             self.elite = population.genes[best_fitness_idx, :].copy()
             self.elite_fitness = best_fitness
-
 
     def __classic_generation(self, merge_parent_offspring=False):
         # create offspring population
@@ -153,7 +153,6 @@ class Evolution:
 
         self.population = select(self.population, self.population_size,
                                  selection_name=self.selection_name)
-
 
     def __umda_generation(self):
         offspring = Population(self.population_size, self.genotype_length, self.initialization)
@@ -295,7 +294,6 @@ class Evolution:
 
         self.population = offspring
 
-
     def __pfda_generation(self):
         offspring = Population(self.population_size, self.genotype_length, self.initialization)
         offspring.genes[:] = self.population.genes[:]
@@ -427,7 +425,6 @@ class Evolution:
                 print('generation:', i_gen, 'best fitness:', self.elite_fitness, 'avg. fitness:',
                       np.mean(self.population.fitnesses))
 
-
             data.append({"num-generations": i_gen,
                          "num-evaluations": self.num_evaluations,
                          "time-elapsed": time.time() - start_time_seconds,
@@ -457,20 +454,19 @@ class Evolution:
         return data
 
 
-
 if __name__ == '__main__':
     evo = Evolution(100,
                     REFERENCE_IMAGE,
-                    evolution_type = 'p+o',
-                    population_size = 100,
-                    generation_budget = 300,
-                    crossover_method = 'ONE_POINT',
-                    initialization = 'PARTIAL_LOCAL_OPT',
-                    num_features_mutation_strength = .25,
-                    num_features_mutation_strength_decay = None,
-                    num_features_mutation_strength_decay_generations = None,
-                    selection_name = 'tournament_4',
-                    noisy_evaluations = False,
-                    verbose = True,
+                    evolution_type='p+o',
+                    population_size=100,
+                    generation_budget=300,
+                    crossover_method='ONE_POINT',
+                    initialization='PARTIAL_LOCAL_OPT',
+                    num_features_mutation_strength=.25,
+                    num_features_mutation_strength_decay=None,
+                    num_features_mutation_strength_decay_generations=None,
+                    selection_name='tournament_4',
+                    noisy_evaluations=False,
+                    verbose=True,
                     opt_fraction=0.75)
-    evo.run()
+    evo.run(ExperimentData())
