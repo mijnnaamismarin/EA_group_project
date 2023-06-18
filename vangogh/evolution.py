@@ -5,13 +5,12 @@ from PIL import Image
 
 from sklearn.neighbors import KernelDensity
 
-from vangogh.population import Population
-from vangogh.selection import select
-from vangogh.variation import crossover, mutate
-from vangogh.fitness import drawing_fitness_function, draw_voronoi_image
-
-from vangogh import selection, variation
-from vangogh.util import NUM_VARIABLES_PER_POINT, IMAGE_SHRINK_SCALE, REFERENCE_IMAGE
+from population import *
+from selection import select
+from variation import crossover, mutate
+from fitness import drawing_fitness_function, draw_voronoi_image
+from experiment_module.experiment_data import ExperimentData
+from util import NUM_VARIABLES_PER_POINT, IMAGE_SHRINK_SCALE, REFERENCE_IMAGE
 
 
 class Evolution:
@@ -175,7 +174,7 @@ class Evolution:
 
         self.population.stack(offspring)
 
-        self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
+        self.population = select(self.population, self.population_size, selection_name=self.selection_name)
 
     def __umda_mutation_generation(self):
         offspring = Population(self.population_size, self.genotype_length, self.initialization)
@@ -183,8 +182,8 @@ class Evolution:
         offspring.shuffle()
 
         # variation
-        offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
-        offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
+        offspring.genes = crossover(offspring.genes, self.crossover_method)
+        offspring.genes = mutate(offspring.genes, self.feature_intervals,
                                            mutation_probability=self.mutation_probability,
                                            num_features_mutation_strength=self.num_features_mutation_strength)
 
@@ -203,7 +202,7 @@ class Evolution:
 
         self.population.stack(offspring)
 
-        self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
+        self.population = select(self.population, self.population_size, selection_name=self.selection_name)
 
     def __kernel_density_rgb_generation(self):
         offspring = Population(self.population_size, self.genotype_length, self.initialization)
@@ -211,8 +210,8 @@ class Evolution:
         offspring.shuffle()
 
         # variation
-        offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
-        offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
+        offspring.genes = crossover(offspring.genes, self.crossover_method)
+        offspring.genes = mutate(offspring.genes, self.feature_intervals,
                                            mutation_probability=self.mutation_probability,
                                            num_features_mutation_strength=self.num_features_mutation_strength)
 
@@ -251,7 +250,7 @@ class Evolution:
 
         self.population.stack(offspring)
 
-        self.population = selection.select(self.population, self.population_size,
+        self.population = select(self.population, self.population_size,
                                            selection_name=self.selection_name)
 
     def __pbil_generation(self):
@@ -263,7 +262,7 @@ class Evolution:
 
         self.__update_elite(offspring)
 
-        parents = selection.select(offspring, self.population_size, selection_name=self.selection_name)
+        parents = select(offspring, self.population_size, selection_name=self.selection_name)
 
         for i in range(self.genotype_length):
             hist, bins = np.histogram(parents.genes[:, i], bins=self.feature_intervals[i][1],
@@ -358,8 +357,8 @@ class Evolution:
         offspring.genes[:, g_row_indices] = new_g_genes
         offspring.genes[:, b_row_indices] = new_b_genes
 
-        offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
-        offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
+        offspring.genes = crossover(offspring.genes, self.crossover_method)
+        offspring.genes = mutate(offspring.genes, self.feature_intervals,
                                            mutation_probability=self.mutation_probability,
                                            num_features_mutation_strength=self.num_features_mutation_strength)
 
@@ -370,7 +369,7 @@ class Evolution:
         self.__update_elite(offspring)
 
         self.population.stack(offspring)
-        self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
+        self.population = select(self.population, self.population_size, selection_name=self.selection_name)
 
     def run(self, experiment_data):
         data = []
@@ -465,12 +464,13 @@ if __name__ == '__main__':
                     population_size = 100,
                     generation_budget = 300,
                     crossover_method = 'ONE_POINT',
-                    initialization = 'PARTIAL_LOCAL_OPT',
+                    initialization = 'PARTIAL_LOCAL_OPT_LOAD',
                     num_features_mutation_strength = .25,
                     num_features_mutation_strength_decay = None,
                     num_features_mutation_strength_decay_generations = None,
                     selection_name = 'tournament_4',
                     noisy_evaluations = False,
                     verbose = True,
-                    opt_fraction=0.75)
-    evo.run()
+                    opt_fraction=0.25)
+    
+    evo.run(ExperimentData())

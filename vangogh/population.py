@@ -4,7 +4,7 @@ import pickle
 import numpy as np
 import scipy as sp
 
-from vangogh.fitness import individual_fitness
+from fitness import individual_fitness
 from multiprocessing import Pool, cpu_count
 
 
@@ -80,6 +80,26 @@ class Population:
                     self.genes = pickle.load(handle)
             else:
                 raise Exception("No pickle file found")
+            
+                    # Load from pickle file
+        elif self.initialization == "PARTIAL_LOCAL_OPT_LOAD":
+            if os.path.isfile(pickle_file_name):
+                with open(pickle_file_name, 'rb') as handle:
+                    self.genes = pickle.load(handle)
+            elif os.path.isfile("result_0.2.pickle"):
+                print("opt_fraction did not match, loading result_0.2.pickle")
+                with open("result_0.2.pickle", 'rb') as handle:
+                    self.opt_fraction = 0.2
+                    self.genes = pickle.load(handle)
+            else:
+                raise Exception("No pickle file found")
+            
+            # randomize all the random genes again, and keep the local maxima genes
+            for individual_index in range(round(n * self.opt_fraction), n):
+                for feature_index in range(l):
+                    random_feature_value = np.random.randint(low=feature_intervals[feature_index][0],
+                                                            high=feature_intervals[feature_index][1])
+                    self.genes[individual_index, feature_index] = random_feature_value
         else:
             raise Exception("Unknown initialization method")
 
