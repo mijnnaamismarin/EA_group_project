@@ -154,6 +154,37 @@ class Evolution:
         self.population = select(self.population, self.population_size,
                                  selection_name=self.selection_name)
 
+    def __classic_generation_fiscis(self, merge_parent_offspring=False):
+        # create offspring population
+        offspring = Population(self.population.genes.shape[0], self.genotype_length, self.initialization)
+        offspring.genes[:] = self.population.genes[:]
+        offspring.shuffle()
+        # variation
+        offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
+        offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
+                                           mutation_probability=self.mutation_probability,
+                                           num_features_mutation_strength=self.num_features_mutation_strength)
+        # evaluate offspring
+        offspring.fitnesses = drawing_fitness_function(offspring.genes,
+                                                       self.reference_image)
+        self.num_evaluations += len(offspring.genes)
+
+        self.__update_elite(offspring)
+
+        # selection
+        if merge_parent_offspring:
+            # p+o mode
+            self.population.stack(offspring)
+        else:
+            # just replace the entire thing
+            self.population = offspring
+
+        self.population = selection.select(self.population, self.population_size,
+                                           selection_name=self.selection_name)
+        self.population.fitnesses = drawing_fitness_function(self.population.genes,
+                                                             self.reference_image)
+        self.__update_elite(self.population)
+
     def __umda_generation(self):
         offspring = Population(self.population_size, self.genotype_length, self.initialization)
         offspring.genes[:] = self.population.genes[:]
@@ -396,6 +427,8 @@ class Evolution:
 
             if self.evolution_type == 'classic':
                 self.__classic_generation(merge_parent_offspring=False)
+            elif self.evolution_type == 'classic_fiscis':
+                self.__classic_generation_fiscis(merge_parent_offspring=False)
             elif self.evolution_type == 'PBIL':
                 self.probabilities = np.empty(self.genotype_length, dtype=object)
                 for i in range(self.genotype_length):

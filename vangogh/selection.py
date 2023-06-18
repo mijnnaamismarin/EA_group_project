@@ -71,7 +71,6 @@ def fiscis_select(population):
     return selected
 
 
-#####################
 # Function to estimate probabilities of the selected population
 def estimate_probabilities(selected_population):
     population_size, genotype_length = selected_population.genes.shape
@@ -98,11 +97,9 @@ def sample_new_population(probabilities, gene_values_list, population_size):
     return new_population
 
 
-#####################
-
-
 def fiscis_umda_select(
-        population):  # fiscis, umda hybrid, should only work classical, p+o doesn't work.(to make it work it needs additional parameters for p+o situation)
+        population):  # fiscis, umda hybrid, should only work classical, p+o doesn't work.(to make it work it needs
+    # additional parameters for p+o situation)
     N_original, genotype_length = population.genes.shape
     selected = Population(N_original, genotype_length, "N/A")
 
