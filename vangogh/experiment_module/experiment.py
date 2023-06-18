@@ -4,6 +4,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy.stats import mannwhitneyu, wilcoxon, ttest_ind
 from time import time
+
 from vangogh.experiment_module.experiment_data import ExperimentData
 
 

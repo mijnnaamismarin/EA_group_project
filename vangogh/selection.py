@@ -40,14 +40,13 @@ def tournament_select(population, selection_size, tournament_size=4):
         # shuffle
         population.shuffle()
 
-        winning_indices = np.argmin(population.fitnesses.squeeze().reshape((-1, tournament_size)),
-                                    axis=1)
+        winning_indices = np.argmin(population.fitnesses.squeeze().reshape((-1, tournament_size)), axis=1)
         winning_indices += np.arange(0, n, tournament_size)
 
-        selected.genes[i * num_selected_per_iteration:(i + 1) * num_selected_per_iteration,
-        :] = population.genes[winning_indices, :]
-        selected.fitnesses[i * num_selected_per_iteration:(i + 1) * num_selected_per_iteration] = \
-            population.fitnesses[winning_indices]
+        selected.genes[i * num_selected_per_iteration:(i + 1) * num_selected_per_iteration, :] = population.genes[
+                                                                                                 winning_indices, :]
+        selected.fitnesses[i * num_selected_per_iteration:(i + 1) * num_selected_per_iteration] = population.fitnesses[
+            winning_indices]
 
     return selected
 

@@ -5,10 +5,13 @@ from PIL import Image
 
 from sklearn.neighbors import KernelDensity
 
-from vangogh import selection, variation
-from vangogh.fitness import drawing_fitness_function, draw_voronoi_image
 from vangogh.population import Population
-from vangogh.util import NUM_VARIABLES_PER_POINT, IMAGE_SHRINK_SCALE
+from vangogh.selection import select
+from vangogh.variation import crossover, mutate
+from vangogh.fitness import drawing_fitness_function, draw_voronoi_image
+
+from vangogh import selection, variation
+from vangogh.util import NUM_VARIABLES_PER_POINT, IMAGE_SHRINK_SCALE, REFERENCE_IMAGE
 
 
 class Evolution:
@@ -31,7 +34,8 @@ class Evolution:
                  generation_reporter=None,
                  learning_rate=0.1,
                  learning_rate_neg=0.075,
-                 seed=0):
+                 seed=0,
+                 opt_fraction = 0.2):
 
         def warn(*args, **kwargs):
             pass
@@ -46,6 +50,7 @@ class Evolution:
                                         int(self.reference_image.height / IMAGE_SHRINK_SCALE)),
                                        Image.ANTIALIAS)
         self.reference_image_array = np.asarray(self.reference_image)
+
 
         num_variables = num_points * NUM_VARIABLES_PER_POINT
         feature_intervals = []
@@ -76,13 +81,14 @@ class Evolution:
         self.initialization = initialization
         self.learning_rate = learning_rate
         self.learning_rate_neg = learning_rate_neg
+        self.opt_fraction = opt_fraction
 
         np.random.seed(seed)
         self.seed = seed
 
         # set feature intervals to be a np.array
         if type(feature_intervals) != np.array:
-            self.feature_intervals = np.array(feature_intervals, dtype=object)
+            self.feature_intervals = np.array(feature_intervals, dtype = object)
 
         # check that tournament size is compatible
         if 'tournament' in selection_name:
@@ -92,7 +98,7 @@ class Evolution:
 
         # set up population and elite
         self.genotype_length = len(feature_intervals)
-        self.population = Population(self.population_size, self.genotype_length, self.initialization)
+        self.population = Population(self.population_size, self.genotype_length, self.initialization, opt_fraction = self.opt_fraction)
         self.elite = None
         self.elite_fitness = np.inf
 
@@ -118,20 +124,24 @@ class Evolution:
             self.elite = population.genes[best_fitness_idx, :].copy()
             self.elite_fitness = best_fitness
 
+
     def __classic_generation(self, merge_parent_offspring=False):
-        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        # create offspring population
+        offspring = Population(self.population_size, self.genotype_length, self.initialization,
+                               opt_fraction=self.opt_fraction)
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
-
         # variation
-        offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
-        offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
-                                           mutation_probability=self.mutation_probability,
-                                           num_features_mutation_strength=self.num_features_mutation_strength)
+        offspring.genes = crossover(offspring.genes, self.crossover_method)
+        offspring.genes = mutate(offspring.genes, self.feature_intervals,
+                                 mutation_probability=self.mutation_probability,
+                                 num_features_mutation_strength=self.num_features_mutation_strength)
         # evaluate offspring
         offspring.fitnesses = drawing_fitness_function(offspring.genes,
                                                        self.reference_image)
         self.num_evaluations += len(offspring.genes)
+
+        self.__update_elite(offspring)
 
         # selection
         if merge_parent_offspring:
@@ -141,12 +151,9 @@ class Evolution:
             # just replace the entire thing
             self.population = offspring
 
-        self.population = selection.select(self.population, self.population_size,
-                                           selection_name=self.selection_name)
+        self.population = select(self.population, self.population_size,
+                                 selection_name=self.selection_name)
 
-        self.population.fitnesses = drawing_fitness_function(self.population.genes,
-                                                             self.reference_image)
-        self.__update_elite(self.population)
 
     def __umda_generation(self):
         offspring = Population(self.population_size, self.genotype_length, self.initialization)
@@ -420,6 +427,7 @@ class Evolution:
                 print('generation:', i_gen, 'best fitness:', self.elite_fitness, 'avg. fitness:',
                       np.mean(self.population.fitnesses))
 
+
             data.append({"num-generations": i_gen,
                          "num-evaluations": self.num_evaluations,
                          "time-elapsed": time.time() - start_time_seconds,
@@ -447,3 +455,22 @@ class Evolution:
             .save(
             f"./img/van_gogh_final_{self.seed}_{self.population_size}_{self.crossover_method}_{self.num_points}_{self.initialization}_{self.generation_budget}.png")
         return data
+
+
+
+if __name__ == '__main__':
+    evo = Evolution(100,
+                    REFERENCE_IMAGE,
+                    evolution_type = 'p+o',
+                    population_size = 100,
+                    generation_budget = 300,
+                    crossover_method = 'ONE_POINT',
+                    initialization = 'PARTIAL_LOCAL_OPT',
+                    num_features_mutation_strength = .25,
+                    num_features_mutation_strength_decay = None,
+                    num_features_mutation_strength_decay_generations = None,
+                    selection_name = 'tournament_4',
+                    noisy_evaluations = False,
+                    verbose = True,
+                    opt_fraction=0.75)
+    evo.run()

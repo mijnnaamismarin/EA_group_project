@@ -2,14 +2,15 @@ import numpy as np
 
 
 def crossover(genes, method="ONE_POINT"):
-    parents_1 = np.vstack((genes[:len(genes) // 2], genes[:(len(genes)+1) // 2]))
-    parents_2 = np.vstack((genes[len(genes) // 2:], genes[(len(genes)+1) // 2:]))
-    
+    parents_1 = np.vstack((genes[:len(genes) // 2], genes[:(len(genes) + 1) // 2]))
+    parents_2 = np.vstack((genes[len(genes) // 2:], genes[(len(genes) + 1) // 2:]))
+
     if method == "ONE_POINT":
         crossover_points = np.random.randint(0, genes.shape[1], size=genes.shape[0])
         offspring = np.zeros(shape=genes.shape, dtype=int)
         for i in range(len(genes)):
-            offspring[i,:] = np.where(np.arange(genes.shape[1]) <= crossover_points[i], parents_1[i,:], parents_2[i,:])
+            offspring[i, :] = np.where(np.arange(genes.shape[1]) <= crossover_points[i], parents_1[i, :],
+                                       parents_2[i, :])
 
     elif method == "TWO_POINT":
         crossover_points = np.sort(np.random.choice(genes.shape[1], size=(genes.shape[0], 2), replace=False))
@@ -17,7 +18,7 @@ def crossover(genes, method="ONE_POINT"):
         for i in range(len(genes)):
             offspring[i, :] = np.where(
                 (np.arange(genes.shape[1]) >= crossover_points[i][0]) & (
-                            np.arange(genes.shape[1]) <= crossover_points[i][1]),
+                        np.arange(genes.shape[1]) <= crossover_points[i][1]),
                 parents_1[i, :],
                 parents_2[i, :]
             )
@@ -30,7 +31,7 @@ def crossover(genes, method="ONE_POINT"):
 
         for n in range(genes.shape[0]):
             mask = np.random.uniform(0, 1, genes.shape[1])
-            offspring[n,:] = np.where(mask < p, parents_1[n,:], parents_2[n,:])
+            offspring[n, :] = np.where(mask < p, parents_1[n, :], parents_2[n, :])
     else:
         raise Exception("Unknown crossover method")
 
