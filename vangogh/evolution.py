@@ -111,10 +111,8 @@ class Evolution:
             self.elite = population.genes[best_fitness_idx, :].copy()
             self.elite_fitness = best_fitness
 
-    def __classic_generation(self, merge_parent_offspring=False):
+    def __classic_generation_fiscis(self, merge_parent_offspring=False):
         # create offspring population
-        #offspring = Population(self.population_size, self.genotype_length, self.initialization)###
-        #print(f"num population:{self.population.genes.shape[0]}")
         offspring = Population(self.population.genes.shape[0], self.genotype_length, self.initialization)###
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
@@ -128,7 +126,7 @@ class Evolution:
                                                        self.reference_image)
         self.num_evaluations += len(offspring.genes)
 
-        self.__update_elite(offspring)###jin
+        self.__update_elite(offspring)
 
         # selection
         if merge_parent_offspring:
@@ -235,6 +233,8 @@ class Evolution:
 
             if self.evolution_type == 'classic':
                 self.__classic_generation(merge_parent_offspring=False)
+            elif self.evolution_type == 'classic_fiscis':
+                self.__classic_generation_fiscis(merge_parent_offspring=False)
             elif self.evolution_type == 'PBIL':
                 self.probabilities = np.empty(self.genotype_length, dtype=object)
                 for i in range(self.genotype_length):
