@@ -5,14 +5,14 @@ from PIL import Image
 
 from sklearn.neighbors import KernelDensity
 
-from vangogh.experiment_module.experiment_data import ExperimentData
-from vangogh.population import Population
-from vangogh.selection import select
-from vangogh.variation import crossover, mutate
-from vangogh.fitness import drawing_fitness_function, draw_voronoi_image
+from experiment_module.experiment_data import ExperimentData
+from population import Population
+from selection import select
+from variation import crossover, mutate
+from fitness import drawing_fitness_function, draw_voronoi_image
 
-from vangogh import selection, variation
-from vangogh.util import NUM_VARIABLES_PER_POINT, IMAGE_SHRINK_SCALE, REFERENCE_IMAGE
+
+from util import NUM_VARIABLES_PER_POINT, IMAGE_SHRINK_SCALE, REFERENCE_IMAGE
 
 
 class Evolution:
@@ -156,12 +156,12 @@ class Evolution:
 
     def __classic_generation_fiscis(self, merge_parent_offspring=False):
         # create offspring population
-        offspring = Population(self.population.genes.shape[0], self.genotype_length, self.initialization)
+        offspring = Population(self.population.genes.shape[0], self.genotype_length, self.initialization, self.opt_fraction)
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
         # variation
-        offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
-        offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
+        offspring.genes = crossover(offspring.genes, self.crossover_method)
+        offspring.genes = mutate(offspring.genes, self.feature_intervals,
                                            mutation_probability=self.mutation_probability,
                                            num_features_mutation_strength=self.num_features_mutation_strength)
         # evaluate offspring
@@ -179,14 +179,14 @@ class Evolution:
             # just replace the entire thing
             self.population = offspring
 
-        self.population = selection.select(self.population, self.population_size,
+        self.population = select(self.population, self.population_size,
                                            selection_name=self.selection_name)
         self.population.fitnesses = drawing_fitness_function(self.population.genes,
                                                              self.reference_image)
         self.__update_elite(self.population)
 
     def __umda_generation(self):
-        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        offspring = Population(self.population_size, self.genotype_length, self.initialization, self.opt_fraction)
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
 
@@ -205,16 +205,16 @@ class Evolution:
 
         self.population.stack(offspring)
 
-        self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
+        self.population = select(self.population, self.population_size, selection_name=self.selection_name)
 
     def __umda_mutation_generation(self):
-        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        offspring = Population(self.population_size, self.genotype_length, self.initialization, self.opt_fraction)
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
 
         # variation
-        offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
-        offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
+        offspring.genes = crossover(offspring.genes, self.crossover_method)
+        offspring.genes = mutate(offspring.genes, self.feature_intervals,
                                            mutation_probability=self.mutation_probability,
                                            num_features_mutation_strength=self.num_features_mutation_strength)
 
@@ -233,16 +233,16 @@ class Evolution:
 
         self.population.stack(offspring)
 
-        self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
+        self.population = select(self.population, self.population_size, selection_name=self.selection_name)
 
     def __kernel_density_rgb_generation(self):
-        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        offspring = Population(self.population_size, self.genotype_length, self.initialization, self.opt_fraction)
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
 
         # variation
-        offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
-        offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
+        offspring.genes = crossover(offspring.genes, self.crossover_method)
+        offspring.genes = mutate(offspring.genes, self.feature_intervals,
                                            mutation_probability=self.mutation_probability,
                                            num_features_mutation_strength=self.num_features_mutation_strength)
 
@@ -281,11 +281,11 @@ class Evolution:
 
         self.population.stack(offspring)
 
-        self.population = selection.select(self.population, self.population_size,
+        self.population = select(self.population, self.population_size,
                                            selection_name=self.selection_name)
 
     def __pbil_generation(self):
-        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        offspring = Population(self.population_size, self.genotype_length, self.initialization, self.opt_fraction)
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
 
@@ -293,7 +293,7 @@ class Evolution:
 
         self.__update_elite(offspring)
 
-        parents = selection.select(offspring, self.population_size, selection_name=self.selection_name)
+        parents = select(offspring, self.population_size, selection_name=self.selection_name)
 
         for i in range(self.genotype_length):
             hist, bins = np.histogram(parents.genes[:, i], bins=self.feature_intervals[i][1],
@@ -326,7 +326,7 @@ class Evolution:
         self.population = offspring
 
     def __pfda_generation(self):
-        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        offspring = Population(self.population_size, self.genotype_length, self.initialization, self.opt_fraction)
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
 
@@ -387,8 +387,8 @@ class Evolution:
         offspring.genes[:, g_row_indices] = new_g_genes
         offspring.genes[:, b_row_indices] = new_b_genes
 
-        offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
-        offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
+        offspring.genes = crossover(offspring.genes, self.crossover_method)
+        offspring.genes = mutate(offspring.genes, self.feature_intervals,
                                            mutation_probability=self.mutation_probability,
                                            num_features_mutation_strength=self.num_features_mutation_strength)
 
@@ -399,11 +399,11 @@ class Evolution:
         self.__update_elite(offspring)
 
         self.population.stack(offspring)
-        self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
+        self.population = select(self.population, self.population_size, selection_name=self.selection_name)
 
     def run(self, experiment_data):
         data = []
-        self.population = Population(self.population_size, self.genotype_length, self.initialization)
+        self.population = Population(self.population_size, self.genotype_length, self.initialization, self.opt_fraction)
         self.population.initialize(self.feature_intervals)
 
         self.population.fitnesses = drawing_fitness_function(self.population.genes,
@@ -501,5 +501,5 @@ if __name__ == '__main__':
                     selection_name='tournament_4',
                     noisy_evaluations=False,
                     verbose=True,
-                    opt_fraction=0.75)
+                    opt_fraction=0.5)
     evo.run(ExperimentData())
