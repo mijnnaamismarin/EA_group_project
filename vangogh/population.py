@@ -14,7 +14,7 @@ class Population:
         if self.initialization == "RANDOM":
             for i in range(l):
                 init_feat_i = np.random.randint(low=feature_intervals[i][0],
-                                                        high=feature_intervals[i][1], size=n)
+                                                high=feature_intervals[i][1], size=n)
                 self.genes[:, i] = init_feat_i
         else:
             raise Exception("Unknown initialization method")

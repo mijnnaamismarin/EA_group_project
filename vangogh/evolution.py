@@ -1,16 +1,14 @@
-import random
 import time
 
 import numpy as np
 from PIL import Image
-from multiprocessing import Pool, cpu_count
+
+from sklearn.neighbors import KernelDensity
 
 from vangogh import selection, variation
 from vangogh.fitness import drawing_fitness_function, draw_voronoi_image
 from vangogh.population import Population
-from vangogh.util import NUM_VARIABLES_PER_POINT, IMAGE_SHRINK_SCALE, REFERENCE_IMAGE
-
-from collections import defaultdict
+from vangogh.util import NUM_VARIABLES_PER_POINT, IMAGE_SHRINK_SCALE
 
 
 class Evolution:
@@ -35,6 +33,13 @@ class Evolution:
                  learning_rate_neg=0.075,
                  seed=0):
 
+        def warn(*args, **kwargs):
+            pass
+
+        import warnings
+        warnings.warn = warn
+
+        self.epsilon = 0.000001
         self.probabilities = None
         self.reference_image: Image = reference_image.copy()
         self.reference_image.thumbnail((int(self.reference_image.width / IMAGE_SHRINK_SCALE),
@@ -114,11 +119,10 @@ class Evolution:
             self.elite_fitness = best_fitness
 
     def __classic_generation(self, merge_parent_offspring=False):
-        # create offspring population
-        # offspring = Population(self.population_size, self.genotype_length, self.initialization)###
-        offspring = Population(self.population.genes.shape[0], self.genotype_length, self.initialization)  ###
+        offspring = Population(self.population_size, self.genotype_length, self.initialization)
         offspring.genes[:] = self.population.genes[:]
         offspring.shuffle()
+
         # variation
         offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
         offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
@@ -128,8 +132,6 @@ class Evolution:
         offspring.fitnesses = drawing_fitness_function(offspring.genes,
                                                        self.reference_image)
         self.num_evaluations += len(offspring.genes)
-
-        self.__update_elite(offspring)  ###jin
 
         # selection
         if merge_parent_offspring:
@@ -142,9 +144,9 @@ class Evolution:
         self.population = selection.select(self.population, self.population_size,
                                            selection_name=self.selection_name)
 
-        # self.population.fitnesses = drawing_fitness_function(self.population.genes,
-        #                                                      self.reference_image)  ###jin
-        # self.__update_elite(self.population)  ###jin
+        self.population.fitnesses = drawing_fitness_function(self.population.genes,
+                                                             self.reference_image)
+        self.__update_elite(self.population)
 
     def __umda_generation(self):
         offspring = Population(self.population_size, self.genotype_length, self.initialization)
@@ -154,7 +156,7 @@ class Evolution:
         for i in range(self.genotype_length):
             hist, bins = np.histogram(offspring.genes[:, i], bins=self.feature_intervals[i][1],
                                       range=(self.feature_intervals[i][0], self.feature_intervals[i][1]), density=True)
-            distribution = (hist + 0.0001) / np.sum(hist + 0.0001)
+            distribution = (hist + self.epsilon) / np.sum(hist + self.epsilon)
             offspring.genes[:, i] = np.random.choice(np.arange(len(distribution)), size=self.population_size,
                                                      p=distribution).astype(int)
 
@@ -167,6 +169,83 @@ class Evolution:
         self.population.stack(offspring)
 
         self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
+
+    def __umda_mutation_generation(self):
+        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        offspring.genes[:] = self.population.genes[:]
+        offspring.shuffle()
+
+        # variation
+        offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
+        offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
+                                           mutation_probability=self.mutation_probability,
+                                           num_features_mutation_strength=self.num_features_mutation_strength)
+
+        for i in range(self.genotype_length):
+            hist, bins = np.histogram(offspring.genes[:, i], bins=self.feature_intervals[i][1],
+                                      range=(self.feature_intervals[i][0], self.feature_intervals[i][1]), density=True)
+            distribution = (hist + self.epsilon) / np.sum(hist + self.epsilon)
+            offspring.genes[:, i] = np.random.choice(np.arange(len(distribution)), size=self.population_size,
+                                                     p=distribution).astype(int)
+
+        offspring.fitnesses = drawing_fitness_function(offspring.genes, self.reference_image)
+
+        self.num_evaluations += len(offspring.genes)
+
+        self.__update_elite(offspring)
+
+        self.population.stack(offspring)
+
+        self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
+
+    def __pfda_rgb_kernel_generation(self):
+        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        offspring.genes[:] = self.population.genes[:]
+        offspring.shuffle()
+
+        # variation
+        offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
+        offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
+                                           mutation_probability=self.mutation_probability,
+                                           num_features_mutation_strength=self.num_features_mutation_strength)
+
+        for i in range(0, self.genotype_length, 5):  # Iterate over each point (5 elements per point)
+            # Extract X, Y, and RGB values for all points
+            x_values = offspring.genes[:, i]
+            y_values = offspring.genes[:, i + 1]
+            rgb_values = offspring.genes[:, i + 2:i + 5]
+
+            hist, bins = np.histogram(x_values, bins=self.feature_intervals[i][1],
+                                      range=(self.feature_intervals[i][0], self.feature_intervals[i][1]), density=True)
+            distribution = (hist + self.epsilon) / np.sum(hist + self.epsilon)
+            offspring.genes[:, i] = np.random.choice(np.arange(len(distribution)), size=self.population_size,
+                                                     p=distribution).astype(int)
+
+            hist, bins = np.histogram(y_values, bins=self.feature_intervals[i + 1][1],
+                                      range=(self.feature_intervals[i + 1][0], self.feature_intervals[i + 1][1]),
+                                      density=True)
+            distribution = (hist + self.epsilon) / np.sum(hist + self.epsilon)
+            offspring.genes[:, i + 1] = np.random.choice(np.arange(len(distribution)), size=self.population_size,
+                                                         p=distribution).astype(int)
+
+            # Calculate the 3D kernel density estimation for RGB
+            rgb_kde = KernelDensity(bandwidth=0.1)  # Adjust the bandwidth as per your data
+            rgb_kde.fit(rgb_values)
+
+            # Generate new RGB values based on the 3D KDE
+            rgb_indices = rgb_kde.sample(self.population_size)
+            offspring.genes[:, i + 2:i + 5] = rgb_indices  # Assign new RGB values
+
+        offspring.fitnesses = drawing_fitness_function(offspring.genes, self.reference_image)
+
+        self.num_evaluations += len(offspring.genes)
+
+        self.__update_elite(offspring)
+
+        self.population.stack(offspring)
+
+        self.population = selection.select(self.population, self.population_size,
+                                           selection_name=self.selection_name)
 
     def __pbil_generation(self):
         offspring = Population(self.population_size, self.genotype_length, self.initialization)
@@ -207,33 +286,6 @@ class Evolution:
 
         self.num_evaluations += len(offspring.genes)
 
-        self.population = offspring
-
-    def __pbil_paper_generation(self):
-        offspring = Population(self.population_size, self.genotype_length, self.initialization)
-
-        for i in range(self.population_size):
-            for j in range(self.genotype_length):
-                offspring.genes[i, j] = np.random.normal(self.probabilities[j], 30, 1)
-                offspring.genes[i, j] = np.clip(offspring.genes[i, j],
-                                                self.feature_intervals[j][0],
-                                                self.feature_intervals[j][1])
-
-        offspring.fitnesses = drawing_fitness_function(offspring.genes, self.reference_image)
-
-        sort_order = np.argsort(offspring.fitnesses)
-        offspring.genes = offspring.genes[sort_order, :]
-        offspring.fitnesses = offspring.fitnesses[sort_order]
-
-        for j in range(self.population_size):
-            for i in range(self.genotype_length):
-                self.probabilities[i] = self.probabilities[i] * (1.0 - self.learning_rate) + \
-                                        offspring.genes[j][i] * self.learning_rate
-
-        current_solution = Population(1, self.genotype_length, self.initialization)
-        current_solution.genes[:] = self.probabilities.astype(int)
-        current_solution.fitnesses = drawing_fitness_function(current_solution.genes, self.reference_image)
-        self.__update_elite(current_solution)
         self.population = offspring
 
     def __pfda_generation(self):
@@ -362,9 +414,10 @@ class Evolution:
                 self.__pbil_generation()
             elif self.evolution_type == 'UMDA':
                 self.__umda_generation()
-            elif self.evolution_type == 'cGA':
-                self.probabilities = np.mean(self.population.genes, axis=0)
-                self.__cga_generation()
+            elif self.evolution_type == 'UMDA_mutation':
+                self.__umda_mutation_generation()
+            elif self.evolution_type == 'PFDA_RGB_kernel':
+                self.__pfda_rgb_kernel_generation()
             elif self.evolution_type == 'PFDA':
                 self.__pfda_generation()
             elif self.evolution_type == 'p+o':
@@ -406,6 +459,3 @@ class Evolution:
             .save(
             f"./img/van_gogh_final_{self.seed}_{self.population_size}_{self.crossover_method}_{self.num_points}_{self.initialization}_{self.generation_budget}.png")
         return data
-
-    def __cga_generation(self):
-        pass

@@ -3,7 +3,8 @@ numpy>=1.16.1
 imgcompare==0.1.0
 multiprocess==0.70.11.1
 Pillow==8.3.2
-scipy
-matplotlib
+scipy~=1.10.1
+matplotlib~=3.7.1
 seaborn
 pandas
+scikit-learn~=1.2.2

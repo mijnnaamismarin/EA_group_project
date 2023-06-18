@@ -10,9 +10,23 @@ def crossover(genes, method="ONE_POINT"):
         offspring = np.zeros(shape=genes.shape, dtype=int)
         for i in range(len(genes)):
             offspring[i,:] = np.where(np.arange(genes.shape[1]) <= crossover_points[i], parents_1[i,:], parents_2[i,:])
+
+    elif method == "TWO_POINT":
+        crossover_points = np.sort(np.random.choice(genes.shape[1], size=(genes.shape[0], 2), replace=False))
+        offspring = np.zeros(shape=genes.shape, dtype=int)
+        for i in range(len(genes)):
+            offspring[i, :] = np.where(
+                (np.arange(genes.shape[1]) >= crossover_points[i][0]) & (
+                            np.arange(genes.shape[1]) <= crossover_points[i][1]),
+                parents_1[i, :],
+                parents_2[i, :]
+            )
+
     elif method == "UNIFORM":
         offspring = np.zeros(shape=genes.shape, dtype=int)
-        p = 0.5   #crossover probability
+
+        # crossover probability
+        p = 0.5
 
         for n in range(genes.shape[0]):
             mask = np.random.uniform(0, 1, genes.shape[1])
