@@ -377,6 +377,176 @@ class Evolution:
         self.population.stack(offspring)
         self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
 
+    def __pfda_generation_xr_ygb(self):
+        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        offspring.genes[:] = self.population.genes[:]
+        offspring.shuffle()
+
+        rows = np.array([i for i in range(0, self.genotype_length, NUM_VARIABLES_PER_POINT)])
+        x_row_indices = rows
+        r_row_indices = rows + 2
+
+        x_genes = offspring.genes[:, x_row_indices]
+        r_genes = offspring.genes[:, r_row_indices]
+
+        new_x_genes = np.zeros(x_genes.shape, dtype=np.int16)
+        new_y_genes = np.zeros(r_genes.shape, dtype=np.int16)
+
+        for i in range(x_genes.shape[1]):
+            x_col, y_col = x_genes[i], r_genes[i]
+            probs = {}
+            for x, y in zip(x_col, y_col):
+                xy = str(x)+'|'+str(y)
+                probs[xy] = probs.get(xy, 0) + 1
+            probs = {k:v/len(x_col) for k, v in probs.items()}
+            distribution = np.array(list(probs.values()))
+            values = np.array(list(probs.keys()))
+            sampled_indices = np.random.choice(np.arange(len(distribution)), size=len(x_col), p=distribution)
+            sampled_values = values[sampled_indices]
+            sampled_xy = np.array([[int(x.split('|')[0]), int(x.split('|')[1])] for x in sampled_values])
+            sampled_x = sampled_xy[:, 0]
+            sampled_y = sampled_xy[:, 1]
+            new_x_genes[i] = sampled_x
+            new_y_genes[i] = sampled_y
+
+        offspring.genes[:, x_row_indices] = new_y_genes
+        offspring.genes[:, r_row_indices] = new_x_genes
+
+        r_row_indices = rows + 1
+        g_row_indices = rows + 3
+        b_row_indices = rows + 4
+
+        r_genes = offspring.genes[:, r_row_indices]
+        g_genes = offspring.genes[:, g_row_indices]
+        b_genes = offspring.genes[:, b_row_indices]
+
+        new_r_genes = np.zeros(r_genes.shape, dtype=np.int16)
+        new_g_genes = np.zeros(g_genes.shape, dtype=np.int16)
+        new_b_genes = np.zeros(b_genes.shape, dtype=np.int16)
+
+        for i in range(r_genes.shape[1]):
+            r_col, g_col, b_col = r_genes[:, i], g_genes[:, i], b_genes[:, i]
+            count_dict = {}
+            for r, g, b in zip(r_col, g_col, b_col):
+                key = str(r) + '|' + str(g) + '|' + str(b)
+                count_dict[key] = count_dict.get(key, 0) + 1
+
+            total_values = r_genes.shape[0]
+            probs = {k: v / total_values for k, v in count_dict.items()}
+
+            distribution = np.array(list(probs.values()))
+            values = np.array(list(probs.keys()))
+            sampled_indices = np.random.choice(np.arange(len(distribution)), size=r_genes.shape[0], p=distribution)
+            sampled_values = values[sampled_indices]
+            sampled_rgb = np.array(
+                [[int(x.split('|')[0]), int(x.split('|')[1]), int(x.split('|')[2])] for x in sampled_values])
+
+            sampled_r = sampled_rgb[:, 0]
+            sampled_g = sampled_rgb[:, 1]
+            sampled_b = sampled_rgb[:, 2]
+
+            new_r_genes[:, i] = sampled_r
+            new_g_genes[:, i] = sampled_g
+            new_b_genes[:, i] = sampled_b
+
+        offspring.genes[:, r_row_indices] = new_r_genes
+        offspring.genes[:, g_row_indices] = new_g_genes
+        offspring.genes[:, b_row_indices] = new_b_genes
+
+        offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
+        offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
+                                           mutation_probability=self.mutation_probability,
+                                           num_features_mutation_strength=self.num_features_mutation_strength)
+
+        offspring.fitnesses = drawing_fitness_function(offspring.genes, self.reference_image)
+
+        self.num_evaluations += len(offspring.genes)
+
+        self.__update_elite(offspring)
+
+        self.population.stack(offspring)
+        self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
+
+
+    def __pfda_generation_xyrgb(self):
+        offspring = Population(self.population_size, self.genotype_length, self.initialization)
+        offspring.genes[:] = self.population.genes[:]
+        offspring.shuffle()
+
+        rows = np.array([i for i in range(0, self.genotype_length, NUM_VARIABLES_PER_POINT)])
+
+        x_row_indices = rows
+        y_row_indices = rows + 1
+        r_row_indices = rows + 2
+        g_row_indices = rows + 3
+        b_row_indices = rows + 4
+
+        x_genes = offspring.genes[:, x_row_indices]
+        y_genes = offspring.genes[:, y_row_indices]
+        r_genes = offspring.genes[:, r_row_indices]
+        g_genes = offspring.genes[:, g_row_indices]
+        b_genes = offspring.genes[:, b_row_indices]
+
+        new_x_genes = np.zeros(x_genes.shape, dtype=np.int16)
+        new_y_genes = np.zeros(y_genes.shape, dtype=np.int16)
+        new_r_genes = np.zeros(r_genes.shape, dtype=np.int16)
+        new_g_genes = np.zeros(g_genes.shape, dtype=np.int16)
+        new_b_genes = np.zeros(b_genes.shape, dtype=np.int16)
+
+
+        for i in range(r_genes.shape[1]):
+            x_col, y_col, r_col, g_col, b_col = x_genes[:, i], y_genes[:, i], r_genes[:, i], g_genes[:, i], b_genes[:, i]
+            count_dict = {}
+            for x, y, r, g, b in zip(x_col, y_col, r_col, g_col, b_col):
+                key = str(x) + '|' + str(y) + '|' + str(r) + '|' + str(g) + '|' + str(b)
+                count_dict[key] = count_dict.get(key, 0) + 1
+
+            total_values = r_genes.shape[0]
+            probs = {k: v / total_values for k, v in count_dict.items()}
+
+            distribution = np.array(list(probs.values()))
+            values = np.array(list(probs.keys()))
+            sampled_indices = np.random.choice(np.arange(len(distribution)), size=r_genes.shape[0], p=distribution)
+            sampled_values = values[sampled_indices]
+            sampled_xyrgb = np.array(
+                [[int(x.split('|')[0]), int(x.split('|')[1]), int(x.split('|')[2]), int(x.split('|')[3]), int(x.split('|')[4])] for x in sampled_values])
+
+            sampled_x = sampled_xyrgb[:, 0]
+            sampled_y = sampled_xyrgb[:, 1]
+            sampled_r = sampled_xyrgb[:, 2]
+            sampled_g = sampled_xyrgb[:, 3]
+            sampled_b = sampled_xyrgb[:, 4]
+
+            new_x_genes[:, i] = sampled_x
+            new_y_genes[:, i] = sampled_y
+            new_r_genes[:, i] = sampled_r
+            new_g_genes[:, i] = sampled_g
+            new_b_genes[:, i] = sampled_b
+
+        offspring.genes[:, x_row_indices] = new_x_genes
+        offspring.genes[:, y_row_indices] = new_y_genes
+        offspring.genes[:, r_row_indices] = new_r_genes
+        offspring.genes[:, g_row_indices] = new_g_genes
+        offspring.genes[:, b_row_indices] = new_b_genes
+
+        offspring.genes = variation.crossover(offspring.genes, self.crossover_method)
+        offspring.genes = variation.mutate(offspring.genes, self.feature_intervals,
+                                           mutation_probability=self.mutation_probability,
+                                           num_features_mutation_strength=self.num_features_mutation_strength)
+
+        offspring.fitnesses = drawing_fitness_function(offspring.genes, self.reference_image)
+
+        self.num_evaluations += len(offspring.genes)
+
+        self.__update_elite(offspring)
+
+        self.population.stack(offspring)
+        self.population = selection.select(self.population, self.population_size, selection_name=self.selection_name)
+
+
+
+
+
     def run(self, experiment_data):
         data = []
         self.population = Population(self.population_size, self.genotype_length, self.initialization)
@@ -420,6 +590,10 @@ class Evolution:
                 self.__pfda_rgb_kernel_generation()
             elif self.evolution_type == 'PFDA':
                 self.__pfda_generation()
+            elif self.evolution_type == 'PFDA_xr_ygb':
+                self.__pfda_generation_xr_ygb()
+            elif self.evolution_type == 'PFDA_xyrgb':
+                self.__pfda_generation_xyrgb()
             elif self.evolution_type == 'p+o':
                 self.__classic_generation(merge_parent_offspring=True)
             else:
