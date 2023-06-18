@@ -77,18 +77,6 @@ class Population:
             elif os.path.isfile("result_0.2.pickle"):
                 print("opt_fraction did not match, loading result_0.2.pickle")
                 with open("result_0.2.pickle", 'rb') as handle:
-                    self.genes = pickle.load(handle)
-            else:
-                raise Exception("No pickle file found")
-            
-                    # Load from pickle file
-        elif self.initialization == "PARTIAL_LOCAL_OPT_LOAD":
-            if os.path.isfile(pickle_file_name):
-                with open(pickle_file_name, 'rb') as handle:
-                    self.genes = pickle.load(handle)
-            elif os.path.isfile("result_0.2.pickle"):
-                print("opt_fraction did not match, loading result_0.2.pickle")
-                with open("result_0.2.pickle", 'rb') as handle:
                     self.opt_fraction = 0.2
                     self.genes = pickle.load(handle)
             else:

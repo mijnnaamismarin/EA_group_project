@@ -5,11 +5,12 @@ from PIL import Image
 
 from sklearn.neighbors import KernelDensity
 
-from population import *
+from experiment_module.experiment_data import ExperimentData
+from population import Population
 from selection import select
 from variation import crossover, mutate
 from fitness import drawing_fitness_function, draw_voronoi_image
-from experiment_module.experiment_data import ExperimentData
+
 from util import NUM_VARIABLES_PER_POINT, IMAGE_SHRINK_SCALE, REFERENCE_IMAGE
 
 
@@ -34,7 +35,7 @@ class Evolution:
                  learning_rate=0.1,
                  learning_rate_neg=0.075,
                  seed=0,
-                 opt_fraction = 0.2):
+                 opt_fraction=0.2):
 
         def warn(*args, **kwargs):
             pass
@@ -49,7 +50,6 @@ class Evolution:
                                         int(self.reference_image.height / IMAGE_SHRINK_SCALE)),
                                        Image.ANTIALIAS)
         self.reference_image_array = np.asarray(self.reference_image)
-
 
         num_variables = num_points * NUM_VARIABLES_PER_POINT
         feature_intervals = []
@@ -87,7 +87,7 @@ class Evolution:
 
         # set feature intervals to be a np.array
         if type(feature_intervals) != np.array:
-            self.feature_intervals = np.array(feature_intervals, dtype = object)
+            self.feature_intervals = np.array(feature_intervals, dtype=object)
 
         # check that tournament size is compatible
         if 'tournament' in selection_name:
@@ -97,7 +97,8 @@ class Evolution:
 
         # set up population and elite
         self.genotype_length = len(feature_intervals)
-        self.population = Population(self.population_size, self.genotype_length, self.initialization, opt_fraction = self.opt_fraction)
+        self.population = Population(self.population_size, self.genotype_length, self.initialization,
+                                     opt_fraction=self.opt_fraction)
         self.elite = None
         self.elite_fitness = np.inf
 
@@ -122,7 +123,6 @@ class Evolution:
         if self.noisy_evaluations or best_fitness < self.elite_fitness:
             self.elite = population.genes[best_fitness_idx, :].copy()
             self.elite_fitness = best_fitness
-
 
     def __classic_generation(self, merge_parent_offspring=False):
         # create offspring population
@@ -153,6 +153,37 @@ class Evolution:
         self.population = select(self.population, self.population_size,
                                  selection_name=self.selection_name)
 
+    def __classic_generation_fiscis(self, merge_parent_offspring=False):
+        # create offspring population
+        offspring = Population(self.population.genes.shape[0], self.genotype_length, self.initialization,
+                               self.opt_fraction)
+        offspring.genes[:] = self.population.genes[:]
+        offspring.shuffle()
+        # variation
+        offspring.genes = crossover(offspring.genes, self.crossover_method)
+        offspring.genes = mutate(offspring.genes, self.feature_intervals,
+                                 mutation_probability=self.mutation_probability,
+                                 num_features_mutation_strength=self.num_features_mutation_strength)
+        # evaluate offspring
+        offspring.fitnesses = drawing_fitness_function(offspring.genes,
+                                                       self.reference_image)
+        self.num_evaluations += len(offspring.genes)
+
+        self.__update_elite(offspring)
+
+        # selection
+        if merge_parent_offspring:
+            # p+o mode
+            self.population.stack(offspring)
+        else:
+            # just replace the entire thing
+            self.population = offspring
+
+        self.population = select(self.population, self.population_size,
+                                 selection_name=self.selection_name)
+        self.population.fitnesses = drawing_fitness_function(self.population.genes,
+                                                             self.reference_image)
+        self.__update_elite(self.population)
 
     def __umda_generation(self):
         offspring = Population(self.population_size, self.genotype_length, self.initialization, self.opt_fraction)
@@ -184,8 +215,8 @@ class Evolution:
         # variation
         offspring.genes = crossover(offspring.genes, self.crossover_method)
         offspring.genes = mutate(offspring.genes, self.feature_intervals,
-                                           mutation_probability=self.mutation_probability,
-                                           num_features_mutation_strength=self.num_features_mutation_strength)
+                                 mutation_probability=self.mutation_probability,
+                                 num_features_mutation_strength=self.num_features_mutation_strength)
 
         for i in range(self.genotype_length):
             hist, bins = np.histogram(offspring.genes[:, i], bins=self.feature_intervals[i][1],
@@ -212,8 +243,8 @@ class Evolution:
         # variation
         offspring.genes = crossover(offspring.genes, self.crossover_method)
         offspring.genes = mutate(offspring.genes, self.feature_intervals,
-                                           mutation_probability=self.mutation_probability,
-                                           num_features_mutation_strength=self.num_features_mutation_strength)
+                                 mutation_probability=self.mutation_probability,
+                                 num_features_mutation_strength=self.num_features_mutation_strength)
 
         for i in range(0, self.genotype_length, 5):  # Iterate over each point (5 elements per point)
             # Extract X, Y, and RGB values for all points
@@ -251,7 +282,7 @@ class Evolution:
         self.population.stack(offspring)
 
         self.population = select(self.population, self.population_size,
-                                           selection_name=self.selection_name)
+                                 selection_name=self.selection_name)
 
     def __pbil_generation(self):
         offspring = Population(self.population_size, self.genotype_length, self.initialization, self.opt_fraction)
@@ -293,7 +324,6 @@ class Evolution:
         self.num_evaluations += len(offspring.genes)
 
         self.population = offspring
-
 
     def __pfda_generation(self):
         offspring = Population(self.population_size, self.genotype_length, self.initialization, self.opt_fraction)
@@ -359,8 +389,8 @@ class Evolution:
 
         offspring.genes = crossover(offspring.genes, self.crossover_method)
         offspring.genes = mutate(offspring.genes, self.feature_intervals,
-                                           mutation_probability=self.mutation_probability,
-                                           num_features_mutation_strength=self.num_features_mutation_strength)
+                                 mutation_probability=self.mutation_probability,
+                                 num_features_mutation_strength=self.num_features_mutation_strength)
 
         offspring.fitnesses = drawing_fitness_function(offspring.genes, self.reference_image)
 
@@ -373,7 +403,9 @@ class Evolution:
 
     def run(self, experiment_data):
         data = []
-        self.population = Population(self.population_size, self.genotype_length, self.initialization, self.opt_fraction)
+        self.population = Population(self.population_size, self.genotype_length, self.initialization,
+                                     opt_fraction=self.opt_fraction)
+
         self.population.initialize(self.feature_intervals)
 
         self.population.fitnesses = drawing_fitness_function(self.population.genes,
@@ -397,6 +429,8 @@ class Evolution:
 
             if self.evolution_type == 'classic':
                 self.__classic_generation(merge_parent_offspring=False)
+            elif self.evolution_type == 'classic_fiscis':
+                self.__classic_generation_fiscis(merge_parent_offspring=False)
             elif self.evolution_type == 'PBIL':
                 self.probabilities = np.empty(self.genotype_length, dtype=object)
                 for i in range(self.genotype_length):
@@ -425,7 +459,6 @@ class Evolution:
             if self.verbose:
                 print('generation:', i_gen, 'best fitness:', self.elite_fitness, 'avg. fitness:',
                       np.mean(self.population.fitnesses))
-
 
             data.append({"num-generations": i_gen,
                          "num-evaluations": self.num_evaluations,
@@ -456,21 +489,19 @@ class Evolution:
         return data
 
 
-
 if __name__ == '__main__':
     evo = Evolution(100,
                     REFERENCE_IMAGE,
-                    evolution_type = 'p+o',
-                    population_size = 100,
-                    generation_budget = 300,
-                    crossover_method = 'ONE_POINT',
-                    initialization = 'PARTIAL_LOCAL_OPT',
-                    num_features_mutation_strength = .25,
-                    num_features_mutation_strength_decay = None,
-                    num_features_mutation_strength_decay_generations = None,
-                    selection_name = 'tournament_4',
-                    noisy_evaluations = False,
-                    verbose = True,
+                    evolution_type='p+o',
+                    population_size=100,
+                    generation_budget=300,
+                    crossover_method='ONE_POINT',
+                    initialization='PARTIAL_LOCAL_OPT',
+                    num_features_mutation_strength=.25,
+                    num_features_mutation_strength_decay=None,
+                    num_features_mutation_strength_decay_generations=None,
+                    selection_name='tournament_4',
+                    noisy_evaluations=False,
+                    verbose=True,
                     opt_fraction=0.5)
-    
     evo.run(ExperimentData())
