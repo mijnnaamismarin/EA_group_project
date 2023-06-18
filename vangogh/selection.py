@@ -1,6 +1,6 @@
 import numpy as np
 
-from population import Population
+from vangogh.population import Population
 
 
 def select(population, selection_size, selection_name='tournament_4'):

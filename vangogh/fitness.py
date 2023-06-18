@@ -4,7 +4,7 @@ from imgcompare import image_diff
 from multiprocessing import Pool, cpu_count
 from scipy.spatial import KDTree
 
-from util import NUM_VARIABLES_PER_POINT, REFERENCE_IMAGE
+from vangogh.util import NUM_VARIABLES_PER_POINT, REFERENCE_IMAGE
 
 QUERY_POINTS = []
 

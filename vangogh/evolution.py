@@ -5,13 +5,12 @@ from PIL import Image
 
 from sklearn.neighbors import KernelDensity
 
-from experiment_module.experiment_data import ExperimentData
-from population import Population
-from selection import select
-from variation import crossover, mutate
-from fitness import drawing_fitness_function, draw_voronoi_image
+from vangogh.population import Population
+from vangogh.selection import select
+from vangogh.variation import crossover, mutate
+from vangogh.fitness import drawing_fitness_function, draw_voronoi_image
 
-from util import NUM_VARIABLES_PER_POINT, IMAGE_SHRINK_SCALE, REFERENCE_IMAGE
+from vangogh.util import NUM_VARIABLES_PER_POINT, IMAGE_SHRINK_SCALE
 
 
 class Evolution:
@@ -487,21 +486,3 @@ class Evolution:
             .save(
             f"./img/van_gogh_final_{self.seed}_{self.population_size}_{self.crossover_method}_{self.num_points}_{self.initialization}_{self.generation_budget}.png")
         return data
-
-
-if __name__ == '__main__':
-    evo = Evolution(100,
-                    REFERENCE_IMAGE,
-                    evolution_type='p+o',
-                    population_size=100,
-                    generation_budget=300,
-                    crossover_method='ONE_POINT',
-                    initialization='PARTIAL_LOCAL_OPT',
-                    num_features_mutation_strength=.25,
-                    num_features_mutation_strength_decay=None,
-                    num_features_mutation_strength_decay_generations=None,
-                    selection_name='tournament_4',
-                    noisy_evaluations=False,
-                    verbose=True,
-                    opt_fraction=0.5)
-    evo.run(ExperimentData())

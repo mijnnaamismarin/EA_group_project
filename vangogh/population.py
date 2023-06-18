@@ -4,7 +4,7 @@ import pickle
 import numpy as np
 import scipy as sp
 
-from fitness import individual_fitness
+from vangogh.fitness import individual_fitness
 from multiprocessing import Pool, cpu_count
 
 
