@@ -403,7 +403,8 @@ class Evolution:
 
     def run(self, experiment_data):
         data = []
-        self.population = Population(self.population_size, self.genotype_length, self.initialization)
+        self.population = Population(self.population_size, self.genotype_length, self.initialization,
+                                     opt_fraction=self.opt_fraction)
         self.population.initialize(self.feature_intervals)
 
         self.population.fitnesses = drawing_fitness_function(self.population.genes,
